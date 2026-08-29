@@ -340,8 +340,39 @@
             document.body.appendChild(fileInput);
         }
 
+        // Carregar biblioteca XLSX uma única vez
+        let xlsxLoaded = false;
+        function loadXlsxLibrary() {
+            return new Promise((resolve) => {
+                if (xlsxLoaded || window.XLSX) {
+                    xlsxLoaded = true;
+                    resolve();
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
+                script.onload = () => {
+                    xlsxLoaded = true;
+                    resolve();
+                };
+                script.onerror = () => {
+                    showStatus('Erro ao carregar biblioteca de processamento de Excel.', 'error');
+                    resolve(); // Resolver mesmo com erro para não travar
+                };
+                document.head.appendChild(script);
+            });
+        }
+
         // Renderizar tabela inicial
         function renderTable() {
+            if (cardsData.length === 0) {
+                cardsBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #ccc; padding: 40px;">Nenhuma carta carregada. Clique em "Carregar Planilha" para começar.</td></tr>';
+                fillBtn.disabled = true;
+                downloadBtn.disabled = true;
+                return;
+            }
+
             cardsBody.innerHTML = cardsData.map((card, idx) => `
                 <tr class="card-row" data-index="${idx}">
                     <td class="card-name">${escapeHtml(card.name)}</td>
@@ -352,7 +383,10 @@
                 </tr>
             `).join('');
 
-            fillBtn.disabled = false;
+            // Verificar se há cartas para preencher
+            const hasCardsToFill = cardsData.some(card => card.type === null || card.description === null);
+            fillBtn.disabled = !hasCardsToFill;
+            downloadBtn.disabled = false;
         }
 
         // Buscar informações da carta na API Scryfall
@@ -467,9 +501,17 @@
             }
 
             progressContainer.style.display = 'none';
-            fillBtn.disabled = false;
+
+            // Verificar se ainda há cartas a preencher
+            const hasCardsToFill = cardsData.some(card => card.type === null || card.description === null);
+            fillBtn.disabled = hasCardsToFill;
             downloadBtn.disabled = false;
-            showStatus('✅ Todas as cartas foram preenchidas com sucesso!', 'success');
+
+            if (hasCardsToFill) {
+                showStatus('⚠️ Algumas cartas não foram encontradas na API Scryfall.', 'warning');
+            } else {
+                showStatus('✅ Todas as cartas foram preenchidas com sucesso!', 'success');
+            }
         }
 
         // Mostrar mensagem de status
@@ -551,54 +593,51 @@
         }
 
         // Parse Excel
-        function parseExcel(arrayBuffer) {
-            // Carregar biblioteca XLSX dinamicamente
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
-            script.onload = () => {
-                try {
-                    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        async function parseExcel(arrayBuffer) {
+            await loadXlsxLibrary();
 
-                    if (rows.length === 0) {
-                        showStatus('Arquivo Excel vazio.', 'warning');
-                        return;
-                    }
-
-                    const loadedCards = [];
-                    for (let i = 0; i < rows.length; i++) {
-                        const row = rows[i];
-                        if (row && row[0]) {
-                            loadedCards.push({
-                                name: String(row[0]).trim(),
-                                type: null,
-                                description: null,
-                                power: null,
-                                mana: null
-                            });
-                        }
-                    }
-
-                    if (loadedCards.length === 0) {
-                        showStatus('Nenhuma carta encontrada no arquivo.', 'warning');
-                        return;
-                    }
-
-                    cardsData.length = 0;
-                    cardsData.push(...loadedCards);
-                    renderTable();
-                    fillBtn.disabled = false;
-                    showStatus(`✅ ${loadedCards.length} carta(s) carregada(s) com sucesso!`, 'success');
-                } catch (error) {
-                    showStatus(`Erro ao processar Excel: ${error.message}`, 'error');
-                    console.error(error);
+            try {
+                if (!window.XLSX) {
+                    showStatus('Erro: Biblioteca XLSX não disponível.', 'error');
+                    return;
                 }
-            };
-            script.onerror = () => {
-                showStatus('Erro ao carregar biblioteca de processamento de Excel.', 'error');
-            };
-            document.head.appendChild(script);
+
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                if (rows.length === 0) {
+                    showStatus('Arquivo Excel vazio.', 'warning');
+                    return;
+                }
+
+                const loadedCards = [];
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (row && row[0]) {
+                        loadedCards.push({
+                            name: String(row[0]).trim(),
+                            type: null,
+                            description: null,
+                            power: null,
+                            mana: null
+                        });
+                    }
+                }
+
+                if (loadedCards.length === 0) {
+                    showStatus('Nenhuma carta encontrada no arquivo.', 'warning');
+                    return;
+                }
+
+                cardsData.length = 0;
+                cardsData.push(...loadedCards);
+                renderTable();
+                showStatus(`✅ ${loadedCards.length} carta(s) carregada(s) com sucesso!`, 'success');
+            } catch (error) {
+                showStatus(`Erro ao processar Excel: ${error.message}`, 'error');
+                console.error(error);
+            }
         }
 
         // Event listeners
@@ -622,17 +661,28 @@
 
         // Baixar como Excel
         async function downloadAsExcel() {
-            // Usar biblioteca para gerar Excel
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
-            script.onload = () => {
+            if (cardsData.length === 0) {
+                showStatus('Nenhuma carta para baixar.', 'warning');
+                return;
+            }
+
+            await loadXlsxLibrary();
+
+            try {
+                if (!window.XLSX) {
+                    showStatus('Erro: Biblioteca XLSX não disponível.', 'error');
+                    return;
+                }
+
                 const ws = XLSX.utils.json_to_sheet(cardsData);
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, 'Cartas');
                 XLSX.writeFile(wb, 'Junkook_Deck_Preenchido.xlsx');
                 showStatus('✅ Arquivo baixado com sucesso!', 'success');
-            };
-            document.head.appendChild(script);
+            } catch (error) {
+                showStatus(`Erro ao baixar arquivo: ${error.message}`, 'error');
+                console.error(error);
+            }
         }
 
         // Inicializar

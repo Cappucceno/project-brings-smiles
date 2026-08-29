@@ -29,6 +29,8 @@
   .btn-clear:hover { color: #c96a56; border-color: rgba(201,106,86,0.4); background: transparent; }
   .switch { position: relative; display: inline-block; width: 46px; height: 24px; border-radius: 24px; border: 1px solid rgba(201,162,39,0.35); transition: background 0.2s ease; flex-shrink: 0; cursor: pointer; }
   .switch-knob { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; transition: transform 0.2s ease, background 0.2s ease; }
+  @keyframes flask-swirl { to { transform: rotate(360deg); } }
+  .mana-spin { transform-origin: 50px 63px; animation: flask-swirl 3s linear infinite; }
 </style>
 </head>
 <body>
@@ -72,18 +74,25 @@
       <button id="btnLoad" class="btn">Carregar planilha</button>
       <button id="btnFill" class="btn btn-primary">Preencher cartas</button>
       <button id="btnDownload" class="btn">Baixar Excel</button>
+      <button id="btnCompact" class="btn">Visualização compacta</button>
       <button id="btnClear" class="btn btn-clear">Limpar</button>
     </div>
 
-    <label style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 24px; cursor: pointer; user-select: none;">
-      <span id="ptSwitch" class="switch"><span id="ptKnob" class="switch-knob"></span></span>
-      <span id="ptLabel" style="font-size: 17px; color: #cdc19d;">Buscar cartas em PT-BR se tiver disponibilidade</span>
-    </label>
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 32px; margin-bottom: 24px;">
+      <label style="display: inline-flex; align-items: center; gap: 12px; cursor: pointer; user-select: none;">
+        <span id="ptSwitch" class="switch"><span id="ptKnob" class="switch-knob"></span></span>
+        <span id="ptLabel" style="font-size: 17px; color: #cdc19d;">Buscar cartas em PT-BR se tiver disponibilidade</span>
+      </label>
+      <label style="display: inline-flex; align-items: center; gap: 12px; cursor: pointer; user-select: none;">
+        <span id="manaSwitch" class="switch"><span id="manaKnob" class="switch-knob"></span></span>
+        <span id="manaLabel" style="font-size: 17px; color: #cdc19d;">Mostrar mana como emoji</span>
+      </label>
+    </div>
 
     <div id="statusBox" style="display: none; padding: 14px 18px; margin-bottom: 20px; font-size: 17px; line-height: 1.5;"></div>
 
     <div style="border: 1px solid rgba(63,44,18,0.32); background: #d8c69c; overflow-x: auto;">
-      <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+      <table id="cardsTable" style="width: 100%; border-collapse: collapse; table-layout: fixed;">
         <thead>
           <tr id="headRow" style="background: #c3ab78;"></tr>
         </thead>
@@ -92,11 +101,33 @@
       <p id="emptyMsg" style="display: none; margin: 0; padding: 52px 20px; text-align: center; font-size: 17px; font-style: italic; color: #55442a;">Nenhuma carta carregada. Clique em “Carregar planilha” para começar.</p>
     </div>
 
-    <div id="progressBox" style="display: none; margin-top: 22px;">
-      <div style="width: 100%; height: 4px; background: #1c1915; overflow: hidden;">
-        <div id="progressBar" style="height: 100%; background: linear-gradient(90deg, #8d6f18 0%, #e3c463 100%); width: 0%; transition: width 0.3s ease;"></div>
+    <div id="progressBox" style="display: none; align-items: center; gap: 16px; margin-top: 22px;">
+      <svg width="40" height="40" viewBox="0 0 100 100" style="flex-shrink: 0;" aria-label="Preenchendo cartas">
+        <defs>
+          <clipPath id="flaskBodyLoading">
+            <circle cx="50" cy="63" r="27"></circle>
+          </clipPath>
+        </defs>
+        <g clip-path="url(#flaskBodyLoading)" class="mana-spin">
+          <rect x="20" y="33" width="60" height="60" fill="#dfe9f2"></rect>
+          <path d="M53.46,61 L55.47,61.93 L57.08,63.98 L57.78,66.93 L57.18,70.36 L55.08,73.71 L51.5,76.34 L46.75,77.64 L41.36,77.14 L36.03,74.58 L31.56,69.97 L28.72,63.66 L28.16,56.26 L30.25,48.62 L35.09,41.7" fill="none" stroke="#f4efdc" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path d="M52.97,65.68 L52.71,67.87 L51.26,70.03 L48.67,71.61 L45.22,72.11 L41.38,71.14 L37.77,68.55 L35.07,64.44 L33.88,59.15 L34.67,53.29 L37.67,47.62 L42.79,42.97 L49.66,40.15 L57.58,39.78 L65.65,42.24" fill="none" stroke="#2f6fae" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path d="M48.37,66.65 L46.21,67.08 L43.7,66.37 L41.4,64.4 L39.86,61.26 L39.59,57.32 L40.94,53.09 L44.02,49.24 L48.68,46.48 L54.5,45.42 L60.82,46.52 L66.82,49.96 L71.63,55.61 L74.43,63.03 L74.58,71.46" fill="none" stroke="#3a3238" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path d="M46.02,62.58 L44.95,60.65 L44.85,58.05 L46.01,55.25 L48.52,52.82 L52.19,51.35 L56.63,51.32 L61.23,53.06 L65.3,56.64 L68.11,61.85 L69.02,68.2 L67.6,74.97 L63.71,81.29 L57.52,86.24 L49.55,89" fill="none" stroke="#ad3626" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path d="M49.17,59.09 L50.67,57.47 L53.12,56.57 L56.14,56.82 L59.22,58.44 L61.76,61.48 L63.16,65.69 L62.92,70.61 L60.78,75.59 L56.69,79.86 L50.93,82.69 L44.06,83.44 L36.84,81.69 L30.22,77.33 L25.14,70.6" fill="none" stroke="#2e7d4f" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"></path>
+          <ellipse cx="40" cy="50" rx="6" ry="3.5" fill="#ffffff" opacity="0.3"></ellipse>
+        </g>
+        <circle cx="50" cy="63" r="27" fill="none" stroke="#c9a227" stroke-width="2.4"></circle>
+        <rect x="43" y="20" width="14" height="24" fill="none" stroke="#c9a227" stroke-width="2.4"></rect>
+        <rect x="38" y="13" width="24" height="8" rx="3" fill="none" stroke="#c9a227" stroke-width="2.4"></rect>
+        <rect x="45" y="22" width="10" height="20" fill="#1a1713"></rect>
+      </svg>
+      <div style="flex: 1; min-width: 0;">
+        <div style="width: 100%; height: 4px; background: #1c1915; overflow: hidden;">
+          <div id="progressBar" style="height: 100%; background: linear-gradient(90deg, #8d6f18 0%, #e3c463 100%); width: 0%; transition: width 0.3s ease;"></div>
+        </div>
+        <p id="progressText" style="margin: 12px 0 0; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.1em; color: #b8ac8a;">0/0</p>
       </div>
-      <p id="progressText" style="margin: 12px 0 0; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.1em; color: #b8ac8a;">0/0</p>
     </div>
 
     <footer style="margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(201,162,39,0.16); display: flex; flex-wrap: wrap; gap: 10px 32px; justify-content: space-between; align-items: baseline;">
@@ -111,7 +142,7 @@
 <script>
 class App {
   constructor() {
-    this.props = { showVerso: true, density: 'Confortável', ptDefault: true };
+    this.props = { showVerso: true, ptDefault: true };
     this.xlsxLoaded = false;
     this.state = {
       cards: [
@@ -124,6 +155,8 @@ class App {
       ],
       rowStatus: {},
       ptOverride: null,
+      manaEmoji: false,
+      compact: false,
       filling: false,
       status: null,
       done: 0,
@@ -134,6 +167,9 @@ class App {
     this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
     document.getElementById('btnFill').addEventListener('click', () => this.fillCards());
     document.getElementById('btnDownload').addEventListener('click', () => this.downloadAsExcel());
+    document.getElementById('btnCompact').addEventListener('click', () => {
+      this.setState({ compact: !this.state.compact });
+    });
     document.getElementById('btnClear').addEventListener('click', () => {
       if (window.confirm('Tem certeza que deseja limpar todos os dados?')) {
         this.setState({ cards: [], rowStatus: {}, status: null, done: 0, total: 0 });
@@ -142,6 +178,9 @@ class App {
     const togglePt = () => { if (!this.state.filling) this.setState({ ptOverride: !this.isPt() }); };
     document.getElementById('ptSwitch').addEventListener('click', (e) => { e.preventDefault(); togglePt(); });
     document.getElementById('ptLabel').addEventListener('click', (e) => { e.preventDefault(); togglePt(); });
+    const toggleManaEmoji = () => { this.setState({ manaEmoji: !this.state.manaEmoji }); };
+    document.getElementById('manaSwitch').addEventListener('click', (e) => { e.preventDefault(); toggleManaEmoji(); });
+    document.getElementById('manaLabel').addEventListener('click', (e) => { e.preventDefault(); toggleManaEmoji(); });
     this.render();
   }
 
@@ -161,7 +200,33 @@ class App {
   }
 
   cellPad() {
-    return (this.props.density === 'Compacta') ? '9px 14px' : '15px 16px';
+    return this.state.compact ? '9px 14px' : '15px 16px';
+  }
+
+  // Converte símbolos de mana ({W}{U}{B}{R}{G}, números genéricos como
+  // {1}) em emoji temático. Símbolos que não reconhece (híbridos,
+  // Phyrexian, {T}/{Q} etc.) ficam como texto original.
+  manaToEmoji(text) {
+    if (!text) return text;
+    const map = { W: '☀️', U: '💧', B: '💀', R: '🔥', G: '🌳', X: '❌', C: '🔘' };
+    const digitEmoji = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣'];
+    return text.replace(/\{([^{}]+)\}/g, (whole, sym) => {
+      if (map[sym]) return map[sym];
+      if (/^\d+$/.test(sym)) return sym.split('').map(d => digitEmoji[+d]).join('');
+      return whole;
+    });
+  }
+
+  // Aplica a conversão de mana → emoji ao valor de uma célula, quando o
+  // switch está ligado e a coluna é do tipo que pode conter símbolos de
+  // mana (Tipo/Descrição embutem símbolos no texto de habilidade; Poder e
+  // Custo de Mana também usam esse "kind").
+  formatCellValue(col, value) {
+    if (!value) return value;
+    if (this.state.manaEmoji && (col.kind === 'info' || col.kind === 'plain')) {
+      return this.manaToEmoji(value);
+    }
+    return value;
   }
 
   columns() {
@@ -190,11 +255,12 @@ class App {
 
   cellStyle(kind, empty) {
     const pad = this.cellPad();
+    const compact = this.state.compact;
     const base = `padding: ${pad}; vertical-align: top;`;
-    if (empty) return base + ' color: #55442a; font-style: italic;';
-    if (kind === 'name') return base + ' color: #1e1206; font-weight: 600; font-size: 17px; word-break: break-word;';
-    if (kind === 'info') return base + ' color: #2c1c0c; font-size: 15px; line-height: 1.5; white-space: pre-line; word-break: break-word;';
-    return base + " color: #1e1206; font-family: 'JetBrains Mono', monospace; font-size: 13px;";
+    if (empty) return base + ' color: #55442a; font-style: italic;' + (compact ? ' white-space: nowrap;' : '');
+    if (kind === 'name') return base + ' color: #1e1206; font-weight: 600; font-size: 17px; word-break: break-word;' + (compact ? ' white-space: nowrap;' : '');
+    if (kind === 'info') return base + ' color: #2c1c0c; font-size: 15px; line-height: 1.5; word-break: break-word;' + (compact ? ' white-space: nowrap;' : ' white-space: pre-line;');
+    return base + " color: #1e1206; font-family: 'JetBrains Mono', monospace; font-size: 13px;" + (compact ? ' white-space: nowrap;' : '');
   }
 
   showStatus(message, type = 'info') {
@@ -555,7 +621,13 @@ class App {
 
   buildExportAoA() {
     const columns = this.columns();
-    return [columns.map(c => c.label), ...this.state.cards.map(card => columns.map(c => c.get(card) || ''))];
+    return [
+      columns.map(c => c.label),
+      ...this.state.cards.map(card => columns.map(c => {
+        const value = c.get(card);
+        return value ? this.formatCellValue(c, value) : '';
+      }))
+    ];
   }
 
   async downloadAsExcel() {
@@ -608,13 +680,14 @@ class App {
         const td = document.createElement('td');
         const value = col.get(card);
         td.style.cssText = this.cellStyle(col.kind, !value);
-        td.textContent = value ? value : '—';
+        td.textContent = value ? this.formatCellValue(col, value) : '—';
         tr.appendChild(td);
       }
       bodyRows.appendChild(tr);
     });
 
     document.getElementById('emptyMsg').style.display = cards.length === 0 ? 'block' : 'none';
+    document.getElementById('cardsTable').style.tableLayout = this.state.compact ? 'auto' : 'fixed';
 
     // Botões
     const hasCardsToFill = cards.some(c => c.type === null || c.description === null);
@@ -624,12 +697,20 @@ class App {
     const btnDownload = document.getElementById('btnDownload');
     btnDownload.disabled = cards.length === 0;
     btnDownload.style.opacity = cards.length === 0 ? 0.35 : 1;
+    document.getElementById('btnCompact').textContent = this.state.compact ? 'Visualização normal' : 'Visualização compacta';
 
     // Switch PT-BR
     document.getElementById('ptSwitch').style.background = pt ? 'rgba(201,162,39,0.55)' : '#221e18';
     const knob = document.getElementById('ptKnob');
     knob.style.background = pt ? '#f4ead2' : '#6f6757';
     knob.style.transform = pt ? 'translateX(22px)' : 'translateX(0)';
+
+    // Switch mana → emoji
+    const manaOn = this.state.manaEmoji;
+    document.getElementById('manaSwitch').style.background = manaOn ? 'rgba(201,162,39,0.55)' : '#221e18';
+    const manaKnob = document.getElementById('manaKnob');
+    manaKnob.style.background = manaOn ? '#f4ead2' : '#6f6757';
+    manaKnob.style.transform = manaOn ? 'translateX(22px)' : 'translateX(0)';
 
     // Status
     const statusBox = document.getElementById('statusBox');
@@ -653,7 +734,7 @@ class App {
     // Progresso
     const progressBox = document.getElementById('progressBox');
     if (filling) {
-      progressBox.style.display = 'block';
+      progressBox.style.display = 'flex';
       document.getElementById('progressBar').style.width = this.state.total ? (this.state.done / this.state.total * 100) + '%' : '0%';
       document.getElementById('progressText').textContent = `${this.state.done}/${this.state.total}`;
     } else {

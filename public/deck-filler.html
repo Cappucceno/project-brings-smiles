@@ -320,6 +320,7 @@
         ];
 
         const statusEl = document.getElementById('statusMessage');
+        const loadBtn = document.getElementById('loadBtn');
         const fillBtn = document.getElementById('fillBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const clearBtn = document.getElementById('clearBtn');
@@ -327,6 +328,17 @@
         const progressContainer = document.getElementById('progressContainer');
         const progressFill = document.getElementById('progressFill');
         const progressText = document.getElementById('progressText');
+
+        // Input file hidden para carregar planilha
+        let fileInput = document.getElementById('fileInput');
+        if (!fileInput) {
+            fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.id = 'fileInput';
+            fileInput.accept = '.csv,.xlsx,.xls';
+            fileInput.style.display = 'none';
+            document.body.appendChild(fileInput);
+        }
 
         // Renderizar tabela inicial
         function renderTable() {
@@ -479,9 +491,125 @@
             return div.innerHTML;
         }
 
+        // Carregar planilha
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    if (file.name.endsWith('.csv')) {
+                        parseCSV(e.target.result);
+                    } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                        parseExcel(e.target.result);
+                    } else {
+                        showStatus('Formato de arquivo não suportado. Use CSV ou XLSX.', 'error');
+                    }
+                } catch (error) {
+                    showStatus(`Erro ao processar arquivo: ${error.message}`, 'error');
+                    console.error(error);
+                }
+            };
+
+            if (file.name.endsWith('.csv')) {
+                reader.readAsText(file);
+            } else {
+                reader.readAsArrayBuffer(file);
+            }
+
+            // Limpar o input para permitir carregar o mesmo arquivo novamente
+            fileInput.value = '';
+        }
+
+        // Parse CSV
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            if (lines.length === 0) {
+                showStatus('Arquivo CSV vazio.', 'warning');
+                return;
+            }
+
+            const loadedCards = [];
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line) {
+                    loadedCards.push({ name: line, type: null, description: null, power: null, mana: null });
+                }
+            }
+
+            if (loadedCards.length === 0) {
+                showStatus('Nenhuma carta encontrada no arquivo.', 'warning');
+                return;
+            }
+
+            cardsData.length = 0;
+            cardsData.push(...loadedCards);
+            renderTable();
+            fillBtn.disabled = false;
+            showStatus(`✅ ${loadedCards.length} carta(s) carregada(s) com sucesso!`, 'success');
+        }
+
+        // Parse Excel
+        function parseExcel(arrayBuffer) {
+            // Carregar biblioteca XLSX dinamicamente
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
+            script.onload = () => {
+                try {
+                    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    if (rows.length === 0) {
+                        showStatus('Arquivo Excel vazio.', 'warning');
+                        return;
+                    }
+
+                    const loadedCards = [];
+                    for (let i = 0; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (row && row[0]) {
+                            loadedCards.push({
+                                name: String(row[0]).trim(),
+                                type: null,
+                                description: null,
+                                power: null,
+                                mana: null
+                            });
+                        }
+                    }
+
+                    if (loadedCards.length === 0) {
+                        showStatus('Nenhuma carta encontrada no arquivo.', 'warning');
+                        return;
+                    }
+
+                    cardsData.length = 0;
+                    cardsData.push(...loadedCards);
+                    renderTable();
+                    fillBtn.disabled = false;
+                    showStatus(`✅ ${loadedCards.length} carta(s) carregada(s) com sucesso!`, 'success');
+                } catch (error) {
+                    showStatus(`Erro ao processar Excel: ${error.message}`, 'error');
+                    console.error(error);
+                }
+            };
+            script.onerror = () => {
+                showStatus('Erro ao carregar biblioteca de processamento de Excel.', 'error');
+            };
+            document.head.appendChild(script);
+        }
+
         // Event listeners
+        loadBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', handleFileSelect);
+
         fillBtn.addEventListener('click', fillCards);
-        
+
         clearBtn.addEventListener('click', () => {
             if (confirm('Tem certeza que deseja limpar todos os dados?')) {
                 location.reload();

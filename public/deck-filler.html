@@ -424,12 +424,12 @@
         // essa espera de verdade é o circuit breaker em
         // fetchCardWithResilience (mais abaixo).
         // 404 é um "não encontrada" genuíno e não deve ser reprocessado.
-        async function fetchScryfall(url, retries = 4) {
+        async function fetchScryfall(url, options = {}, retries = 4) {
             const networkRetries = 1;
             for (let attempt = 0; attempt <= retries; attempt++) {
                 let response;
                 try {
-                    response = await fetch(url);
+                    response = await fetch(url, options);
                 } catch (networkError) {
                     if (attempt < networkRetries) {
                         await delay(300 * (attempt + 1));
@@ -567,6 +567,104 @@
             }
         }
 
+        // Divide um array em pedaços de tamanho fixo
+        function chunkArray(array, size) {
+            const chunks = [];
+            for (let i = 0; i < array.length; i += size) {
+                chunks.push(array.slice(i, i + size));
+            }
+            return chunks;
+        }
+
+        // Versão genérica do circuit breaker acima, para as chamadas em
+        // lote: reexecuta a função inteira após uma pausa real quando o
+        // erro é de rede/CORS; qualquer outro erro é propagado na hora.
+        async function withResilience(fn, label, onCooldown) {
+            const maxAttempts = 6;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    return await fn();
+                } catch (error) {
+                    if (!error.isNetworkError || attempt >= maxAttempts) {
+                        throw error;
+                    }
+                    const cooldownMs = attempt === 1 ? 1500 : 8000;
+                    if (onCooldown) {
+                        onCooldown(label, cooldownMs, attempt);
+                    }
+                    await delay(cooldownMs);
+                }
+            }
+        }
+
+        // Busca várias cartas de uma vez pelo endpoint de coleção da
+        // Scryfall (até 75 identificadores por chamada), em vez de uma
+        // requisição fuzzy por carta. Exige nomes exatos — nomes que não
+        // baterem voltam em "notFound" para tentativa individual depois.
+        async function fetchCollectionBatch(names) {
+            const identifiers = names.map(name => ({ name }));
+            const response = await fetchScryfall('https://api.scryfall.com/cards/collection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifiers })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erro ao buscar lote de cartas: ${response.status}`);
+            }
+
+            const result = await response.json();
+            return {
+                found: result.data || [],
+                notFound: (result.not_found || []).map(identifier => identifier.name)
+            };
+        }
+
+        // Busca a tradução em português de várias cartas em uma única
+        // requisição, combinando os nomes exatos com "or" na query de
+        // busca da Scryfall (em vez de uma busca por carta).
+        async function fetchPortugueseBatch(names) {
+            const ptMap = new Map();
+            const escapedNames = names.map(name => name.replace(/"/g, '\\"'));
+            const query = escapedNames.map(name => `!"${name}"`).join(' or ');
+            const searchUrl = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(`(${query}) lang:pt`)}&unique=prints&order=released&dir=desc`;
+            const response = await fetchScryfall(searchUrl);
+
+            if (!response.ok) {
+                // Sem tradução disponível para este lote: os cards seguem em inglês
+                return ptMap;
+            }
+
+            const result = await response.json();
+            for (const card of (result.data || [])) {
+                // order=released&dir=desc garante que a primeira ocorrência de
+                // cada nome é a impressão em português mais recente
+                if (!ptMap.has(card.name)) {
+                    ptMap.set(card.name, card);
+                }
+            }
+            return ptMap;
+        }
+
+        // Monta o objeto de carta preenchida a partir dos dados em inglês
+        // (endpoint de coleção) e, se existir, da tradução em português
+        function buildCardInfo(data, ptMap) {
+            let name = data.name;
+            let type = data.type_line || '';
+            let description = data.oracle_text || '';
+            const power = data.power && data.toughness ? `${data.power}/${data.toughness}` : '';
+            const mana = data.mana_cost || '';
+
+            const ptCard = ptMap.get(data.name);
+            if (ptCard) {
+                name = ptCard.printed_name || name;
+                type = ptCard.printed_type_line || type;
+                description = ptCard.printed_text || description;
+            }
+
+            return { name, type, description, power, mana, found: true };
+        }
+
         // Preencher as cartas
         async function fillCards() {
             const cardsToFill = cardsData.filter((card, idx) => {
@@ -586,45 +684,132 @@
             let networkErrors = 0;
             const total = cardsToFill.length;
 
-            for (let i = 0; i < cardsData.length; i++) {
-                const card = cardsData[i];
-                if (card.type === null || card.description === null) {
-                    const row = document.querySelector(`tr[data-index="${i}"]`);
-                    row.classList.add('loading');
+            const onCooldown = (label, cooldownMs) => {
+                showStatus(
+                    `⏸️ Conexão com a Scryfall instável (${label}). Pausando ${Math.round(cooldownMs / 1000)}s antes de tentar novamente...`,
+                    'warning'
+                );
+            };
 
-                    const cardInfo = await fetchCardWithResilience(card.name, (name, cooldownMs, attempt) => {
-                        showStatus(
-                            `⏸️ Conexão com a Scryfall instável (carta: ${name}). Pausando ${Math.round(cooldownMs / 1000)}s antes de tentar novamente...`,
-                            'warning'
-                        );
-                    });
+            function applyResult(idx, info) {
+                const row = document.querySelector(`tr[data-index="${idx}"]`);
+                row.classList.remove('loading');
 
-                    if (cardInfo.found) {
-                        cardsData[i] = { ...cardsData[i], ...cardInfo };
-                        row.classList.add('completed');
-                        row.classList.remove('loading');
-                    } else {
-                        if (cardInfo.isNetworkError) {
-                            networkErrors++;
-                        }
-                        row.classList.add('error');
-                        row.classList.remove('loading');
+                if (info.found) {
+                    cardsData[idx] = { ...cardsData[idx], ...info };
+                    row.classList.add('completed');
+                } else {
+                    if (info.isNetworkError) {
+                        networkErrors++;
                     }
+                    row.classList.add('error');
+                }
 
-                    // Atualizar linha
-                    row.innerHTML = `
-                        <td class="card-name">${escapeHtml(cardsData[i].name)}</td>
-                        <td class="card-info">${cardsData[i].type ? escapeHtml(cardsData[i].type) : '<span class="empty-cell">—</span>'}</td>
-                        <td class="card-info">${cardsData[i].description ? escapeHtml(cardsData[i].description) : '<span class="empty-cell">—</span>'}</td>
-                        <td>${cardsData[i].power ? escapeHtml(cardsData[i].power) : '<span class="empty-cell">—</span>'}</td>
-                        <td>${cardsData[i].mana ? escapeHtml(cardsData[i].mana) : '<span class="empty-cell">—</span>'}</td>
-                    `;
+                row.innerHTML = `
+                    <td class="card-name">${escapeHtml(cardsData[idx].name)}</td>
+                    <td class="card-info">${cardsData[idx].type ? escapeHtml(cardsData[idx].type) : '<span class="empty-cell">—</span>'}</td>
+                    <td class="card-info">${cardsData[idx].description ? escapeHtml(cardsData[idx].description) : '<span class="empty-cell">—</span>'}</td>
+                    <td>${cardsData[idx].power ? escapeHtml(cardsData[idx].power) : '<span class="empty-cell">—</span>'}</td>
+                    <td>${cardsData[idx].mana ? escapeHtml(cardsData[idx].mana) : '<span class="empty-cell">—</span>'}</td>
+                `;
 
-                    completed++;
-                    progressFill.style.width = (completed / total * 100) + '%';
-                    progressText.textContent = `${completed}/${total}`;
+                completed++;
+                progressFill.style.width = (completed / total * 100) + '%';
+                progressText.textContent = `${completed}/${total}`;
+            }
 
-                    // Respeitar rate limit da Scryfall (recomendado: 50-100ms entre requisições)
+            // Cartas com "//" no nome (dupla face / split) usam busca fuzzy
+            // individual, já que nem sempre batem exato no endpoint de
+            // lote. As demais entram no lote, reduzindo drasticamente o
+            // número de requisições feitas à Scryfall.
+            const fuzzyIndices = [];
+            const batchIndices = [];
+            cardsToFill.forEach(card => {
+                const idx = cardsData.indexOf(card);
+                if (card.name.includes('//')) {
+                    fuzzyIndices.push(idx);
+                } else {
+                    batchIndices.push(idx);
+                }
+            });
+
+            [...fuzzyIndices, ...batchIndices].forEach(idx => {
+                document.querySelector(`tr[data-index="${idx}"]`).classList.add('loading');
+            });
+
+            // 1) Cartas multi-face: busca individual
+            for (const idx of fuzzyIndices) {
+                const info = await fetchCardWithResilience(cardsData[idx].name, onCooldown);
+                applyResult(idx, info);
+                await delay(100);
+            }
+
+            // 2) Demais cartas: busca em lote
+            if (batchIndices.length > 0) {
+                const nameToIndices = new Map();
+                batchIndices.forEach(idx => {
+                    const name = cardsData[idx].name;
+                    if (!nameToIndices.has(name)) {
+                        nameToIndices.set(name, []);
+                    }
+                    nameToIndices.get(name).push(idx);
+                });
+
+                const uniqueNames = [...nameToIndices.keys()];
+                const foundByName = new Map();
+                const notFoundNames = [];
+
+                for (const chunk of chunkArray(uniqueNames, 75)) {
+                    try {
+                        const result = await withResilience(
+                            () => fetchCollectionBatch(chunk),
+                            'lote de cartas',
+                            onCooldown
+                        );
+                        for (const card of result.found) {
+                            foundByName.set(card.name, card);
+                        }
+                        notFoundNames.push(...result.notFound);
+                    } catch (e) {
+                        console.error('Falha ao buscar lote de cartas:', e);
+                        notFoundNames.push(...chunk);
+                    }
+                    await delay(150);
+                }
+
+                // Traduções em português em lote, usando os nomes exatos
+                // devolvidos pela Scryfall (para casar corretamente)
+                const exactNames = [...foundByName.values()].map(card => card.name);
+                const ptMap = new Map();
+                for (const chunk of chunkArray(exactNames, 10)) {
+                    try {
+                        const chunkPtMap = await withResilience(
+                            () => fetchPortugueseBatch(chunk),
+                            'traduções em português',
+                            onCooldown
+                        );
+                        chunkPtMap.forEach((value, key) => ptMap.set(key, value));
+                    } catch (e) {
+                        // Sem tradução disponível para este lote: seguem em inglês
+                        console.warn('Falha ao buscar traduções em português em lote:', e);
+                    }
+                    await delay(150);
+                }
+
+                for (const [name, data] of foundByName) {
+                    const info = buildCardInfo(data, ptMap);
+                    for (const idx of nameToIndices.get(name)) {
+                        applyResult(idx, info);
+                    }
+                }
+
+                // Nomes que não bateram exato no lote: tentar individualmente
+                // via busca fuzzy antes de desistir de vez
+                for (const name of notFoundNames) {
+                    const info = await fetchCardWithResilience(name, onCooldown);
+                    for (const idx of nameToIndices.get(name)) {
+                        applyResult(idx, info);
+                    }
                     await delay(100);
                 }
             }

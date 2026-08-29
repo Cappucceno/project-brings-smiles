@@ -416,18 +416,23 @@
         }
 
         // Fazer fetch na Scryfall com retry/backoff para erros transitórios
-        // (429/5xx) e também para falhas de rede/CORS (fetch rejeitando antes
-        // de existir uma resposta HTTP — típico de bloqueio temporário no
-        // edge da Scryfall após um volume alto de requisições).
+        // (429/5xx). Falhas de rede/CORS (fetch rejeitando antes de existir
+        // uma resposta HTTP) só recebem uma tentativa extra rápida aqui —
+        // quando isso se repete, geralmente é um bloqueio temporário de
+        // alguns segundos no edge da Scryfall, e insistir rapidamente só
+        // desperdiça tentativas sem esperar o bloqueio passar. Quem trata
+        // essa espera de verdade é o circuit breaker em
+        // fetchCardWithResilience (mais abaixo).
         // 404 é um "não encontrada" genuíno e não deve ser reprocessado.
         async function fetchScryfall(url, retries = 4) {
+            const networkRetries = 1;
             for (let attempt = 0; attempt <= retries; attempt++) {
                 let response;
                 try {
                     response = await fetch(url);
                 } catch (networkError) {
-                    if (attempt < retries) {
-                        await delay(400 * (attempt + 1));
+                    if (attempt < networkRetries) {
+                        await delay(300 * (attempt + 1));
                         continue;
                     }
                     // Esgotaram as tentativas: propagar como falha de rede/CORS,
@@ -531,6 +536,37 @@
             }
         }
 
+        // Circuit breaker: quando a busca de uma carta falha por rede/CORS,
+        // normalmente é um bloqueio temporário (edge da Scryfall reagindo a
+        // um volume alto de requisições) que dura alguns segundos — não que
+        // a carta não exista. Em vez de desistir e passar para a próxima
+        // carta (o que só faz o app martelar o bloqueio em várias cartas
+        // seguidas até ele passar sozinho), esperamos de verdade e
+        // reprocessamos a MESMA carta antes de seguir em frente.
+        async function fetchCardWithResilience(cardName, onCooldown) {
+            const maxAttempts = 6;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                const info = await fetchCardFromScryfall(cardName);
+
+                if (!info.isNetworkError) {
+                    return info;
+                }
+
+                if (attempt >= maxAttempts) {
+                    return info;
+                }
+
+                // Primeira falha: pausa curta (pode ser só um soluço pontual).
+                // A partir da segunda falha seguida: pausa bem maior, para
+                // dar tempo real do bloqueio ser liberado.
+                const cooldownMs = attempt === 1 ? 1500 : 8000;
+                if (onCooldown) {
+                    onCooldown(cardName, cooldownMs, attempt);
+                }
+                await delay(cooldownMs);
+            }
+        }
+
         // Preencher as cartas
         async function fillCards() {
             const cardsToFill = cardsData.filter((card, idx) => {
@@ -556,7 +592,12 @@
                     const row = document.querySelector(`tr[data-index="${i}"]`);
                     row.classList.add('loading');
 
-                    const cardInfo = await fetchCardFromScryfall(card.name);
+                    const cardInfo = await fetchCardWithResilience(card.name, (name, cooldownMs, attempt) => {
+                        showStatus(
+                            `⏸️ Conexão com a Scryfall instável (carta: ${name}). Pausando ${Math.round(cooldownMs / 1000)}s antes de tentar novamente...`,
+                            'warning'
+                        );
+                    });
 
                     if (cardInfo.found) {
                         cardsData[i] = { ...cardsData[i], ...cardInfo };
@@ -597,7 +638,7 @@
 
             if (networkErrors > 0) {
                 showStatus(
-                    `⚠️ Erro de conexão com a Scryfall em ${networkErrors} carta(s) (não é que elas não existam — a API pode estar temporariamente bloqueando/limitando as requisições). Aguarde um pouco e clique em "Preencher Cartas" novamente.`,
+                    `⚠️ Erro de conexão persistente com a Scryfall em ${networkErrors} carta(s) mesmo após novas tentativas com pausas (não é que elas não existam). Aguarde um pouco mais e clique em "Preencher Cartas" novamente.`,
                     'error'
                 );
             } else if (hasCardsToFill) {

@@ -340,27 +340,46 @@
             document.body.appendChild(fileInput);
         }
 
-        // Carregar biblioteca XLSX uma única vez
+        // Carregar biblioteca XLSX uma única vez com fallbacks
         let xlsxLoaded = false;
         function loadXlsxLibrary() {
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 if (xlsxLoaded || window.XLSX) {
                     xlsxLoaded = true;
-                    resolve();
+                    resolve(true);
                     return;
                 }
 
-                const script = document.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
-                script.onload = () => {
-                    xlsxLoaded = true;
-                    resolve();
-                };
-                script.onerror = () => {
-                    showStatus('Erro ao carregar biblioteca de processamento de Excel.', 'error');
-                    resolve(); // Resolver mesmo com erro para não travar
-                };
-                document.head.appendChild(script);
+                // Tentar múltiplas fontes
+                const sources = [
+                    'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js',
+                    'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.min.js'
+                ];
+
+                let attemptCount = 0;
+                function tryLoadFromSource() {
+                    if (attemptCount >= sources.length) {
+                        showStatus('Erro: Não foi possível carregar a biblioteca XLSX. Tente novamente.', 'error');
+                        reject(new Error('Biblioteca XLSX indisponível'));
+                        return;
+                    }
+
+                    const script = document.createElement('script');
+                    script.src = sources[attemptCount];
+                    script.timeout = 5000;
+                    script.onload = () => {
+                        xlsxLoaded = true;
+                        resolve(true);
+                    };
+                    script.onerror = () => {
+                        attemptCount++;
+                        // Tentar próxima fonte
+                        tryLoadFromSource();
+                    };
+                    document.head.appendChild(script);
+                }
+
+                tryLoadFromSource();
             });
         }
 
@@ -594,11 +613,11 @@
 
         // Parse Excel
         async function parseExcel(arrayBuffer) {
-            await loadXlsxLibrary();
-
             try {
+                await loadXlsxLibrary();
+
                 if (!window.XLSX) {
-                    showStatus('Erro: Biblioteca XLSX não disponível.', 'error');
+                    showStatus('Erro: Biblioteca XLSX não disponível após tentativas de carregamento.', 'error');
                     return;
                 }
 
@@ -636,7 +655,7 @@
                 showStatus(`✅ ${loadedCards.length} carta(s) carregada(s) com sucesso!`, 'success');
             } catch (error) {
                 showStatus(`Erro ao processar Excel: ${error.message}`, 'error');
-                console.error(error);
+                console.error('Erro ao carregar Excel:', error);
             }
         }
 
@@ -666,11 +685,11 @@
                 return;
             }
 
-            await loadXlsxLibrary();
-
             try {
+                await loadXlsxLibrary();
+
                 if (!window.XLSX) {
-                    showStatus('Erro: Biblioteca XLSX não disponível.', 'error');
+                    showStatus('Erro: Biblioteca XLSX não disponível após tentativas de carregamento.', 'error');
                     return;
                 }
 
@@ -681,7 +700,7 @@
                 showStatus('✅ Arquivo baixado com sucesso!', 'success');
             } catch (error) {
                 showStatus(`Erro ao baixar arquivo: ${error.message}`, 'error');
-                console.error(error);
+                console.error('Erro ao baixar Excel:', error);
             }
         }
 

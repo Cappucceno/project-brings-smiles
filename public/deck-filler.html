@@ -1,1258 +1,668 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Preenchedor de Deck Scryfall</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            padding: 20px;
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
-        }
-
-        .header {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        .header p {
-            font-size: 1.1em;
-            opacity: 0.9;
-        }
-
-        .content {
-            padding: 30px;
-        }
-
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-        }
-
-        button {
-            padding: 12px 24px;
-            font-size: 1em;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 600;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(30, 60, 114, 0.3);
-        }
-
-        .btn-primary:active {
-            transform: translateY(0);
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-
-        .btn-success {
-            background: #28a745;
-            color: white;
-        }
-
-        .btn-success:hover {
-            background: #218838;
-        }
-
-        .status {
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .status.show {
-            display: block;
-        }
-
-        .status.info {
-            background: #e7f3ff;
-            border-left: 4px solid #2196F3;
-            color: #0c5460;
-        }
-
-        .status.success {
-            background: #d4edda;
-            border-left: 4px solid #28a745;
-            color: #155724;
-        }
-
-        .status.error {
-            background: #f8d7da;
-            border-left: 4px solid #dc3545;
-            color: #721c24;
-        }
-
-        .status.warning {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            color: #856404;
-        }
-
-        .table-wrapper {
-            overflow-x: auto;
-            border-radius: 6px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-        }
-
-        thead {
-            background: #f8f9fa;
-            border-bottom: 2px solid #dee2e6;
-        }
-
-        th {
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
-            color: #1e3c72;
-            font-size: 0.95em;
-        }
-
-        td {
-            padding: 12px 15px;
-            border-bottom: 1px solid #dee2e6;
-        }
-
-        tbody tr {
-            transition: background-color 0.2s ease;
-        }
-
-        tbody tr:hover {
-            background-color: #f8f9fa;
-        }
-
-        tbody tr.loading {
-            background-color: #fffacd;
-        }
-
-        tbody tr.completed {
-            background-color: #e8f5e9;
-        }
-
-        tbody tr.error {
-            background-color: #ffebee;
-        }
-
-        .card-name {
-            font-weight: 600;
-            color: #1e3c72;
-            word-break: break-word;
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #2a5298;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .loading-cell {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: #666;
-        }
-
-        .empty-cell {
-            color: #ccc;
-            font-style: italic;
-        }
-
-        .footer {
-            padding: 20px 30px;
-            background: #f8f9fa;
-            border-top: 1px solid #dee2e6;
-            text-align: center;
-            font-size: 0.9em;
-            color: #666;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 6px;
-            background: #e9ecef;
-            border-radius: 3px;
-            overflow: hidden;
-            margin-top: 10px;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #2a5298 0%, #6eb7e8 100%);
-            width: 0%;
-            transition: width 0.3s ease;
-        }
-
-        .card-info {
-            font-size: 0.9em;
-            color: #666;
-            max-height: 100px;
-            overflow-y: auto;
-            word-break: break-word;
-            line-height: 1.4;
-            white-space: pre-line;
-        }
-
-        .tag {
-            display: inline-block;
-            background: #e9ecef;
-            color: #495057;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.85em;
-            margin-right: 4px;
-        }
-
-        .option-toggle {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 44px;
-            height: 24px;
-            flex-shrink: 0;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .switch-slider {
-            position: absolute;
-            cursor: pointer;
-            inset: 0;
-            background-color: #ccc;
-            border-radius: 24px;
-            transition: background-color 0.2s ease;
-        }
-
-        .switch-slider::before {
-            content: "";
-            position: absolute;
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            border-radius: 50%;
-            transition: transform 0.2s ease;
-        }
-
-        .switch input:checked + .switch-slider {
-            background-color: #28a745;
-        }
-
-        .switch input:checked + .switch-slider::before {
-            transform: translateX(20px);
-        }
-
-        .option-toggle label.option-label {
-            font-size: 0.95em;
-            color: #333;
-            cursor: pointer;
-            user-select: none;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preenchedor de Deck Scryfall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #1c130b;
+    color: #e8e0cf;
+    font-family: 'EB Garamond', Georgia, serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: #c9a227; text-decoration: none; border-bottom: 1px solid rgba(201,162,39,0.35); }
+  a:hover { color: #e3c463; border-bottom-color: rgba(227,196,99,0.7); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: #100e0c; }
+  ::-webkit-scrollbar-thumb { background: #2c2721; border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: #453d31; }
+  .btn { padding: 12px 22px; font-family: 'Cinzel', Georgia, serif; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #e8dfc9; background: transparent; border: 1px solid rgba(201,162,39,0.42); border-radius: 2px; cursor: pointer; transition: all 0.2s ease; }
+  .btn:hover { background: rgba(201,162,39,0.1); border-color: #c9a227; color: #f4ead2; }
+  .btn-primary { padding: 12px 26px; color: #191510; background: linear-gradient(180deg, #dcb84a 0%, #b8901f 100%); border: 1px solid #e3c463; font-weight: 600; box-shadow: 0 6px 18px rgba(201,162,39,0.16); }
+  .btn-primary:hover { background: linear-gradient(180deg, #e8c85e 0%, #c79c25 100%); color: #191510; }
+  .btn-clear { border-color: transparent; color: #b8ac8a; margin-left: auto; }
+  .btn-clear:hover { color: #c96a56; border-color: rgba(201,106,86,0.4); background: transparent; }
+  .switch { position: relative; display: inline-block; width: 46px; height: 24px; border-radius: 24px; border: 1px solid rgba(201,162,39,0.35); transition: background 0.2s ease; flex-shrink: 0; cursor: pointer; }
+  .switch-knob { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; transition: transform 0.2s ease, background 0.2s ease; }
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🎴 Preenchedor de Deck Scryfall</h1>
-            <p>Preencha automaticamente os dados das cartas Magic: The Gathering usando a API Scryfall</p>
-        </div>
 
-        <div class="content">
-            <div class="controls">
-                <button class="btn-primary" id="loadBtn">📁 Carregar Planilha</button>
-                <button class="btn-success" id="fillBtn" disabled>🔄 Preencher Cartas</button>
-                <button class="btn-secondary" id="downloadBtn" disabled>⬇️ Baixar Excel</button>
-                <button class="btn-secondary" id="clearBtn">🗑️ Limpar</button>
-            </div>
+<div style="min-height: 100vh; background: radial-gradient(1200px 700px at 50% -220px, #3a2716 0%, #1c130b 62%); padding: 44px 28px 64px; font-family: 'EB Garamond', Georgia, serif;">
+  <div style="position: relative; max-width: 1400px; margin: 0 auto; padding: 34px 40px; background: linear-gradient(160deg, #2f2013 0%, #1a1209 65%); border-radius: 4px; box-shadow: inset 0 2px 3px rgba(255,255,255,0.06), inset 0 -5px 10px rgba(0,0,0,0.7), 0 18px 40px rgba(0,0,0,0.5); border: 1px solid rgba(0,0,0,0.5);">
+    <span style="position: absolute; top: 12px; left: 12px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #e8c874, #8a621e 65%, #3a2508); box-shadow: 0 1px 2px rgba(0,0,0,0.6);"></span>
+    <span style="position: absolute; top: 12px; right: 12px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #e8c874, #8a621e 65%, #3a2508); box-shadow: 0 1px 2px rgba(0,0,0,0.6);"></span>
+    <span style="position: absolute; bottom: 12px; left: 12px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #e8c874, #8a621e 65%, #3a2508); box-shadow: 0 1px 2px rgba(0,0,0,0.6);"></span>
+    <span style="position: absolute; bottom: 12px; right: 12px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #e8c874, #8a621e 65%, #3a2508); box-shadow: 0 1px 2px rgba(0,0,0,0.6);"></span>
 
-            <div class="option-toggle">
-                <label class="switch">
-                    <input type="checkbox" id="ptToggle" checked>
-                    <span class="switch-slider"></span>
-                </label>
-                <label for="ptToggle" class="option-label">Buscar cartas em PT-BR se tiver disponibilidade</label>
-            </div>
+    <header style="display: flex; align-items: center; gap: 26px; padding-bottom: 30px; border-bottom: 1px solid rgba(201,162,39,0.22);">
+      <svg width="66" height="66" viewBox="0 0 100 100" style="flex-shrink: 0; filter: drop-shadow(0 6px 18px rgba(201,162,39,0.18));" aria-label="Frasco de poção com as cinco cores de Magic">
+        <defs>
+          <clipPath id="flaskBody">
+            <circle cx="50" cy="63" r="27"></circle>
+          </clipPath>
+        </defs>
+        <g clip-path="url(#flaskBody)">
+          <rect x="20" y="33" width="60" height="60" fill="#dfe9f2"></rect>
+          <path d="M53.46,61 L55.47,61.93 L57.08,63.98 L57.78,66.93 L57.18,70.36 L55.08,73.71 L51.5,76.34 L46.75,77.64 L41.36,77.14 L36.03,74.58 L31.56,69.97 L28.72,63.66 L28.16,56.26 L30.25,48.62 L35.09,41.7" fill="none" stroke="#f4efdc" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path d="M52.97,65.68 L52.71,67.87 L51.26,70.03 L48.67,71.61 L45.22,72.11 L41.38,71.14 L37.77,68.55 L35.07,64.44 L33.88,59.15 L34.67,53.29 L37.67,47.62 L42.79,42.97 L49.66,40.15 L57.58,39.78 L65.65,42.24" fill="none" stroke="#2f6fae" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path d="M48.37,66.65 L46.21,67.08 L43.7,66.37 L41.4,64.4 L39.86,61.26 L39.59,57.32 L40.94,53.09 L44.02,49.24 L48.68,46.48 L54.5,45.42 L60.82,46.52 L66.82,49.96 L71.63,55.61 L74.43,63.03 L74.58,71.46" fill="none" stroke="#3a3238" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path d="M46.02,62.58 L44.95,60.65 L44.85,58.05 L46.01,55.25 L48.52,52.82 L52.19,51.35 L56.63,51.32 L61.23,53.06 L65.3,56.64 L68.11,61.85 L69.02,68.2 L67.6,74.97 L63.71,81.29 L57.52,86.24 L49.55,89" fill="none" stroke="#ad3626" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path d="M49.17,59.09 L50.67,57.47 L53.12,56.57 L56.14,56.82 L59.22,58.44 L61.76,61.48 L63.16,65.69 L62.92,70.61 L60.78,75.59 L56.69,79.86 L50.93,82.69 L44.06,83.44 L36.84,81.69 L30.22,77.33 L25.14,70.6" fill="none" stroke="#2e7d4f" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"></path>
+          <ellipse cx="40" cy="50" rx="6" ry="3.5" fill="#ffffff" opacity="0.3"></ellipse>
+        </g>
+        <circle cx="50" cy="63" r="27" fill="none" stroke="#c9a227" stroke-width="2.4"></circle>
+        <rect x="43" y="20" width="14" height="24" fill="none" stroke="#c9a227" stroke-width="2.4"></rect>
+        <rect x="38" y="13" width="24" height="8" rx="3" fill="none" stroke="#c9a227" stroke-width="2.4"></rect>
+        <rect x="45" y="22" width="10" height="20" fill="#1a1713"></rect>
+      </svg>
+      <div style="min-width: 0;">
+        <p style="margin: 0 0 8px; font-family: 'Cinzel', Georgia, serif; font-size: 11px; letter-spacing: 0.34em; text-transform: uppercase; color: #cdc19d;">Grimório de Planilhas</p>
+        <h1 style="margin: 0 0 10px; font-family: 'Cinzel', Georgia, serif; font-weight: 700; font-size: 34px; line-height: 1.1; color: #f0e6cf; letter-spacing: 0.02em;">Preenchedor de Deck Scryfall</h1>
+        <p style="margin: 0; font-size: 18px; line-height: 1.5; color: #cdc19d; max-width: 720px; text-wrap: pretty;">Preencha planilhas e as utilize como variáveis para o preenchimento automático em projetos próprios.</p>
+      </div>
+    </header>
 
-            <div id="statusMessage" class="status"></div>
-
-            <div class="table-wrapper">
-                <table id="cardsTable">
-                    <thead>
-                        <tr id="tableHeadRow">
-                            <th style="width: 200px;">Nome</th>
-                            <th style="width: 250px;">Tipo</th>
-                            <th style="width: 400px;">Descrição da Carta</th>
-                            <th style="width: 120px;">Poder e Resistência</th>
-                            <th style="width: 120px;">Custo de Mana</th>
-                        </tr>
-                    </thead>
-                    <tbody id="cardsBody">
-                    </tbody>
-                </table>
-            </div>
-
-            <div id="progressContainer" style="display: none;">
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-                <p style="text-align: center; margin-top: 10px; font-size: 0.9em; color: #666;">
-                    <span id="progressText">0/0</span>
-                </p>
-            </div>
-        </div>
-
-        <div class="footer">
-            <p>Powered by Scryfall API • Desenvolvido para preencher decks Magic: The Gathering</p>
-        </div>
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 30px 0 22px;">
+      <button id="btnLoad" class="btn">Carregar planilha</button>
+      <button id="btnFill" class="btn btn-primary">Preencher cartas</button>
+      <button id="btnDownload" class="btn">Baixar Excel</button>
+      <button id="btnClear" class="btn btn-clear">Limpar</button>
     </div>
 
-    <script>
-        // Dados da planilha
-        const cardsData = [
-            { name: 'Arahbo, Roar of the World', namePt: null, type: 'Criatura Lendária — Felino Avatar', description: 'Eminência — No início do combate no seu turno, se Arahbo, Rugido do Mundo, estiver na zona de comando ou no campo de batalha, outro Felino alvo que você controla recebe +3/+3 até o final do turno.\n\nToda vez que outro Felino que você controla ataca, você pode pagar {1}{G}{W}. Se fizer isso, ele ganha atropelar e recebe +X/+X até o final do turno, sendo X seu poder.', nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: '5/5', mana: '{3}{G}{W}' },
-            { name: 'Arahbo, the First Fang', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
-            { name: 'Hungry Lynx', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
-            { name: 'Jazal Goldmane', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
-            { name: 'Kaheera, the Orphanguard', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
-            { name: 'Branchloft Pathway // Boulderloft Pathway', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
-        ];
+    <label style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 24px; cursor: pointer; user-select: none;">
+      <span id="ptSwitch" class="switch"><span id="ptKnob" class="switch-knob"></span></span>
+      <span id="ptLabel" style="font-size: 17px; color: #cdc19d;">Buscar cartas em PT-BR se tiver disponibilidade</span>
+    </label>
 
-        const statusEl = document.getElementById('statusMessage');
-        const loadBtn = document.getElementById('loadBtn');
-        const fillBtn = document.getElementById('fillBtn');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const clearBtn = document.getElementById('clearBtn');
-        const ptToggle = document.getElementById('ptToggle');
-        const tableHeadRow = document.getElementById('tableHeadRow');
-        const cardsBody = document.getElementById('cardsBody');
-        const progressContainer = document.getElementById('progressContainer');
-        const progressFill = document.getElementById('progressFill');
-        const progressText = document.getElementById('progressText');
+    <div id="statusBox" style="display: none; padding: 14px 18px; margin-bottom: 20px; font-size: 17px; line-height: 1.5;"></div>
 
-        // Input file hidden para carregar planilha
-        let fileInput = document.getElementById('fileInput');
-        if (!fileInput) {
-            fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.id = 'fileInput';
-            fileInput.accept = '.csv,.xlsx,.xls';
-            fileInput.style.display = 'none';
-            document.body.appendChild(fileInput);
+    <div style="border: 1px solid rgba(63,44,18,0.32); background: #d8c69c; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+        <thead>
+          <tr id="headRow" style="background: #c3ab78;"></tr>
+        </thead>
+        <tbody id="bodyRows"></tbody>
+      </table>
+      <p id="emptyMsg" style="display: none; margin: 0; padding: 52px 20px; text-align: center; font-size: 17px; font-style: italic; color: #55442a;">Nenhuma carta carregada. Clique em “Carregar planilha” para começar.</p>
+    </div>
+
+    <div id="progressBox" style="display: none; margin-top: 22px;">
+      <div style="width: 100%; height: 4px; background: #1c1915; overflow: hidden;">
+        <div id="progressBar" style="height: 100%; background: linear-gradient(90deg, #8d6f18 0%, #e3c463 100%); width: 0%; transition: width 0.3s ease;"></div>
+      </div>
+      <p id="progressText" style="margin: 12px 0 0; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.1em; color: #b8ac8a;">0/0</p>
+    </div>
+
+    <footer style="margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(201,162,39,0.16); display: flex; flex-wrap: wrap; gap: 10px 32px; justify-content: space-between; align-items: baseline;">
+      <p style="margin: 0; font-family: 'Cinzel', Georgia, serif; font-size: 10.5px; letter-spacing: 0.2em; text-transform: uppercase; color: #ab9c76;">Dados fornecidos pela API Scryfall</p>
+      <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #ab9c76; max-width: 640px; text-align: right;">Todos os direitos reservados à Wizards of the Coast. Magic: The Gathering, seus nomes de cartas e símbolos de mana são marcas registradas da Wizards of the Coast LLC. Projeto não oficial, sem vínculo ou endosso oficial.</p>
+    </footer>
+
+    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display: none;">
+  </div>
+</div>
+
+<script>
+class App {
+  constructor() {
+    this.props = { showVerso: true, density: 'Confortável', ptDefault: true };
+    this.xlsxLoaded = false;
+    this.state = {
+      cards: [
+        { name: 'Arahbo, Roar of the World', namePt: null, type: 'Criatura Lendária — Felino Avatar', description: 'Eminência — No início do combate no seu turno, se Arahbo, Rugido do Mundo, estiver na zona de comando ou no campo de batalha, outro Felino alvo que você controla recebe +3/+3 até o final do turno.\n\nToda vez que outro Felino que você controla ataca, você pode pagar {1}{G}{W}. Se fizer isso, ele ganha atropelar e recebe +X/+X até o final do turno, sendo X seu poder.', nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: '5/5', mana: '{3}{G}{W}' },
+        { name: 'Arahbo, the First Fang', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
+        { name: 'Hungry Lynx', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
+        { name: 'Jazal Goldmane', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
+        { name: 'Kaheera, the Orphanguard', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
+        { name: 'Branchloft Pathway // Boulderloft Pathway', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null }
+      ],
+      rowStatus: {},
+      ptOverride: null,
+      filling: false,
+      status: null,
+      done: 0,
+      total: 0
+    };
+    this.fileInput = document.getElementById('fileInput');
+    document.getElementById('btnLoad').addEventListener('click', () => this.fileInput.click());
+    this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+    document.getElementById('btnFill').addEventListener('click', () => this.fillCards());
+    document.getElementById('btnDownload').addEventListener('click', () => this.downloadAsExcel());
+    document.getElementById('btnClear').addEventListener('click', () => {
+      if (window.confirm('Tem certeza que deseja limpar todos os dados?')) {
+        this.setState({ cards: [], rowStatus: {}, status: null, done: 0, total: 0 });
+      }
+    });
+    const togglePt = () => { if (!this.state.filling) this.setState({ ptOverride: !this.isPt() }); };
+    document.getElementById('ptSwitch').addEventListener('click', (e) => { e.preventDefault(); togglePt(); });
+    document.getElementById('ptLabel').addEventListener('click', (e) => { e.preventDefault(); togglePt(); });
+    this.render();
+  }
+
+  setState(update) {
+    const partial = typeof update === 'function' ? update(this.state) : update;
+    Object.assign(this.state, partial);
+    this.render();
+  }
+
+  // ---------- opções ----------
+  isPt() {
+    return this.state.ptOverride === null ? (this.props.ptDefault ?? true) : this.state.ptOverride;
+  }
+
+  showVerso() {
+    return this.props.showVerso ?? true;
+  }
+
+  cellPad() {
+    return (this.props.density === 'Compacta') ? '9px 14px' : '15px 16px';
+  }
+
+  columns() {
+    const pt = this.isPt();
+    const verso = this.showVerso();
+    const cols = [];
+    if (pt) {
+      cols.push({ label: 'Nome original', width: 150, kind: 'name', get: c => c.name });
+      cols.push({ label: 'Nome em português', width: 150, kind: 'name', get: c => c.namePt });
+      if (verso) {
+        cols.push({ label: 'Nome original (Verso)', width: 150, kind: 'name', get: c => c.nameVerso });
+        cols.push({ label: 'Nome em português (Verso)', width: 150, kind: 'name', get: c => c.namePtVerso });
+      }
+    } else {
+      cols.push({ label: 'Nome', width: 180, kind: 'name', get: c => c.name });
+      if (verso) cols.push({ label: 'Nome (Verso)', width: 180, kind: 'name', get: c => c.nameVerso });
+    }
+    cols.push({ label: 'Tipo', width: 200, kind: 'info', get: c => c.type });
+    if (verso) cols.push({ label: 'Tipo (Verso)', width: 200, kind: 'info', get: c => c.typeVerso });
+    cols.push({ label: 'Descrição da Carta', width: 320, kind: 'info', get: c => c.description });
+    if (verso) cols.push({ label: 'Descrição da Carta (Verso)', width: 320, kind: 'info', get: c => c.descriptionVerso });
+    cols.push({ label: 'Poder e Resistência', width: 120, kind: 'plain', get: c => c.power });
+    cols.push({ label: 'Custo de Mana', width: 120, kind: 'plain', get: c => c.mana });
+    return cols;
+  }
+
+  cellStyle(kind, empty) {
+    const pad = this.cellPad();
+    const base = `padding: ${pad}; vertical-align: top;`;
+    if (empty) return base + ' color: #55442a; font-style: italic;';
+    if (kind === 'name') return base + ' color: #1e1206; font-weight: 600; font-size: 17px; word-break: break-word;';
+    if (kind === 'info') return base + ' color: #2c1c0c; font-size: 15px; line-height: 1.5; white-space: pre-line; word-break: break-word;';
+    return base + " color: #1e1206; font-family: 'JetBrains Mono', monospace; font-size: 13px;";
+  }
+
+  showStatus(message, type = 'info') {
+    this.setState({ status: { message, type } });
+    if (type !== 'error' && type !== 'warning') {
+      clearTimeout(this._statusTimer);
+      this._statusTimer = setTimeout(() => this.setState({ status: null }), 5000);
+    }
+  }
+
+  // ---------- XLSX ----------
+  loadXlsxLibrary() {
+    return new Promise((resolve, reject) => {
+      if (this.xlsxLoaded || window.XLSX) { this.xlsxLoaded = true; return resolve(true); }
+      const sources = [
+        '/vendor/xlsx.full.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js',
+        'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.min.js'
+      ];
+      let i = 0;
+      const tryNext = () => {
+        if (i >= sources.length) {
+          this.showStatus('Erro: Não foi possível carregar a biblioteca XLSX. Tente novamente.', 'error');
+          return reject(new Error('Biblioteca XLSX indisponível'));
         }
+        const script = document.createElement('script');
+        script.src = sources[i];
+        script.onload = () => { this.xlsxLoaded = true; resolve(true); };
+        script.onerror = () => { i++; tryNext(); };
+        document.head.appendChild(script);
+      };
+      tryNext();
+    });
+  }
 
-        // Carregar biblioteca XLSX uma única vez com fallbacks
-        let xlsxLoaded = false;
-        function loadXlsxLibrary() {
-            return new Promise((resolve, reject) => {
-                if (xlsxLoaded || window.XLSX) {
-                    xlsxLoaded = true;
-                    resolve(true);
-                    return;
-                }
+  // ---------- rede ----------
+  delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-                // Tentar arquivo local primeiro (evita bloqueios de CSP/rede em previews),
-                // com CDNs externos como último recurso
-                const sources = [
-                    '/vendor/xlsx.full.min.js',
-                    'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js',
-                    'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.min.js'
-                ];
+  async fetchScryfall(url, options = {}, retries = 4) {
+    const networkRetries = 1;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      let response;
+      try {
+        response = await fetch(url, options);
+      } catch (networkError) {
+        if (attempt < networkRetries) { await this.delay(300 * (attempt + 1)); continue; }
+        const err = new Error('Falha de conexão com a Scryfall (rede/CORS)');
+        err.isNetworkError = true;
+        throw err;
+      }
+      if (response.ok || response.status === 404) return response;
+      if (attempt < retries) {
+        const retryAfter = Number(response.headers.get('Retry-After'));
+        await this.delay(retryAfter > 0 ? retryAfter * 1000 : 300 * (attempt + 1));
+        continue;
+      }
+      return response;
+    }
+  }
 
-                let attemptCount = 0;
-                function tryLoadFromSource() {
-                    if (attemptCount >= sources.length) {
-                        showStatus('Erro: Não foi possível carregar a biblioteca XLSX. Tente novamente.', 'error');
-                        reject(new Error('Biblioteca XLSX indisponível'));
-                        return;
-                    }
+  getCardFace(card, index) {
+    if (card && Array.isArray(card.card_faces) && card.card_faces.length > index) return card.card_faces[index];
+    return index === 0 ? card : null;
+  }
 
-                    const script = document.createElement('script');
-                    script.src = sources[attemptCount];
-                    script.timeout = 5000;
-                    script.onload = () => {
-                        xlsxLoaded = true;
-                        resolve(true);
-                    };
-                    script.onerror = () => {
-                        attemptCount++;
-                        // Tentar próxima fonte
-                        tryLoadFromSource();
-                    };
-                    document.head.appendChild(script);
-                }
+  // Monta frente + verso, inglês + PT, a partir de uma carta da Scryfall
+  buildFaceInfo(data, ptCard) {
+    const frontFace = this.getCardFace(data, 0);
+    const backFace = this.getCardFace(data, 1);
+    const name = frontFace.name || data.name;
+    let type = frontFace.type_line || '';
+    let description = frontFace.oracle_text || '';
+    const power = frontFace.power && frontFace.toughness ? `${frontFace.power}/${frontFace.toughness}` : '';
+    const mana = frontFace.mana_cost || '';
+    const nameVerso = backFace ? (backFace.name || null) : null;
+    let typeVerso = backFace ? (backFace.type_line || '') : null;
+    let descriptionVerso = backFace ? (backFace.oracle_text || '') : null;
+    let namePt = null;
+    let namePtVerso = null;
+    if (ptCard) {
+      const ptFrontFace = this.getCardFace(ptCard, 0);
+      const ptBackFace = this.getCardFace(ptCard, 1);
+      namePt = ptFrontFace.printed_name || null;
+      type = ptFrontFace.printed_type_line || type;
+      description = ptFrontFace.printed_text || description;
+      if (backFace) {
+        namePtVerso = ptBackFace ? (ptBackFace.printed_name || null) : null;
+        typeVerso = (ptBackFace && ptBackFace.printed_type_line) || typeVerso;
+        descriptionVerso = (ptBackFace && ptBackFace.printed_text) || descriptionVerso;
+      }
+    }
+    return { name, namePt, type, description, nameVerso, namePtVerso, typeVerso, descriptionVerso, power, mana };
+  }
 
-                tryLoadFromSource();
-            });
+  async fetchCardFromScryfall(cardName) {
+    try {
+      const response = await this.fetchScryfall(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardName)}`);
+      if (response.status === 404) {
+        return { name: cardName, namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null, found: false, error: 'Carta não encontrada' };
+      }
+      if (!response.ok) throw new Error(`Erro: ${response.status}`);
+      const data = await response.json();
+      let ptCard = null;
+      if (this.isPt()) {
+        await this.delay(100);
+        try {
+          const searchUrl = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${data.name}" lang:pt`)}&unique=prints`;
+          const ptResponse = await this.fetchScryfall(searchUrl);
+          if (ptResponse && ptResponse.ok) {
+            const ptResult = await ptResponse.json();
+            ptCard = (ptResult.data && ptResult.data[0]) || null;
+          }
+        } catch (e) {
+          console.warn(`Sem versão em português para ${cardName}:`, e);
         }
+      }
+      return { ...this.buildFaceInfo(data, ptCard), found: true };
+    } catch (error) {
+      console.error(`Erro ao buscar ${cardName}:`, error);
+      return { name: cardName, namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null, found: false, isNetworkError: !!error.isNetworkError, error: error.message };
+    }
+  }
 
-        // Definição das colunas da tabela (e, por extensão, da planilha
-        // exportada) — "Nome" vira "Nome original" + "Nome em português"
-        // quando a tradução estiver ligada, uma única coluna "Nome" quando
-        // estiver desligada. As colunas de "(Verso)" ficam sempre visíveis
-        // (cartas de face única simplesmente mostram traço) — são para
-        // cartas de dupla face/split, que têm nome, tipo e descrição
-        // diferentes em cada lado. Poder/Resistência e Custo de Mana
-        // continuam únicos (só da frente). Fonte única usada pelo
-        // cabeçalho, pelas linhas e pela exportação em Excel, para nunca
-        // ficarem fora de sincronia.
-        function getColumnDefs() {
-            const pt = shouldSearchPortuguese();
+  // Circuit breaker: falha de rede/CORS costuma ser bloqueio temporário —
+  // espera de verdade e reprocessa a MESMA carta antes de seguir.
+  async fetchCardWithResilience(cardName, onCooldown) {
+    const maxAttempts = 6;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const info = await this.fetchCardFromScryfall(cardName);
+      if (!info.isNetworkError || attempt >= maxAttempts) return info;
+      const cooldownMs = attempt === 1 ? 1500 : 8000;
+      if (onCooldown) onCooldown(cardName, cooldownMs, attempt);
+      await this.delay(cooldownMs);
+    }
+  }
 
-            const nameColumns = pt
-                ? [
-                    { label: 'Nome original', width: 150, cellClass: 'card-name', get: card => card.name },
-                    { label: 'Nome em português', width: 150, cellClass: 'card-name', get: card => card.namePt },
-                    { label: 'Nome original (Verso)', width: 150, cellClass: 'card-name', get: card => card.nameVerso },
-                    { label: 'Nome em português (Verso)', width: 150, cellClass: 'card-name', get: card => card.namePtVerso },
-                ]
-                : [
-                    { label: 'Nome', width: 180, cellClass: 'card-name', get: card => card.name },
-                    { label: 'Nome (Verso)', width: 180, cellClass: 'card-name', get: card => card.nameVerso },
-                ];
+  async withResilience(fn, label, onCooldown) {
+    const maxAttempts = 6;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        if (!error.isNetworkError || attempt >= maxAttempts) throw error;
+        const cooldownMs = attempt === 1 ? 1500 : 8000;
+        if (onCooldown) onCooldown(label, cooldownMs, attempt);
+        await this.delay(cooldownMs);
+      }
+    }
+  }
 
-            return [
-                ...nameColumns,
-                { label: 'Tipo', width: 200, cellClass: 'card-info', get: card => card.type },
-                { label: 'Tipo (Verso)', width: 200, cellClass: 'card-info', get: card => card.typeVerso },
-                { label: 'Descrição da Carta', width: 320, cellClass: 'card-info', get: card => card.description },
-                { label: 'Descrição da Carta (Verso)', width: 320, cellClass: 'card-info', get: card => card.descriptionVerso },
-                { label: 'Poder e Resistência', width: 120, cellClass: '', get: card => card.power },
-                { label: 'Custo de Mana', width: 120, cellClass: '', get: card => card.mana },
-            ];
+  async fetchCollectionBatch(names) {
+    const identifiers = names.map(name => ({ name }));
+    const response = await this.fetchScryfall('https://api.scryfall.com/cards/collection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifiers })
+    });
+    if (!response.ok) throw new Error(`Erro ao buscar lote de cartas: ${response.status}`);
+    const result = await response.json();
+    return { found: result.data || [], notFound: (result.not_found || []).map(id => id.name) };
+  }
+
+  async fetchPortugueseBatch(names) {
+    const ptMap = new Map();
+    const query = names.map(n => `!"${n.replace(/"/g, '\\"')}"`).join(' or ');
+    const searchUrl = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(`(${query}) lang:pt`)}&unique=prints&order=released&dir=desc`;
+    const response = await this.fetchScryfall(searchUrl);
+    if (!response.ok) return ptMap;
+    const result = await response.json();
+    for (const card of (result.data || [])) {
+      if (!ptMap.has(card.name)) ptMap.set(card.name, card);
+    }
+    return ptMap;
+  }
+
+  chunkArray(array, size) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += size) chunks.push(array.slice(i, i + size));
+    return chunks;
+  }
+
+  frontSearchName(name) {
+    const sepIndex = name.indexOf('//');
+    return sepIndex === -1 ? name : name.slice(0, sepIndex).trim();
+  }
+
+  normalizeKey(name) { return name.trim().toLowerCase(); }
+
+  // ---------- preenchimento ----------
+  async fillCards() {
+    const cards = this.state.cards;
+    const indicesToFill = cards.map((c, i) => i).filter(i => cards[i].type === null || cards[i].description === null);
+    if (indicesToFill.length === 0) {
+      this.showStatus('Todas as cartas já estão preenchidas!', 'success');
+      return;
+    }
+
+    const total = indicesToFill.length;
+    const rowStatus = { ...this.state.rowStatus };
+    indicesToFill.forEach(i => { rowStatus[i] = 'loading'; });
+    this.setState({ filling: true, done: 0, total, rowStatus });
+    this.showStatus(`Preenchendo ${total} carta(s)...`, 'info');
+
+    let networkErrors = 0;
+    let completed = 0;
+
+    const onCooldown = (label, cooldownMs) => {
+      this.showStatus(`Conexão com a Scryfall instável (${label}). Pausando ${Math.round(cooldownMs / 1000)}s antes de tentar novamente...`, 'warning');
+    };
+
+    const applyResult = (idx, info) => {
+      completed++;
+      this.setState(s => {
+        const nextCards = s.cards.slice();
+        const nextStatus = { ...s.rowStatus };
+        if (info.found) {
+          const { found, error, isNetworkError, ...clean } = info;
+          nextCards[idx] = { ...nextCards[idx], ...clean };
+          nextStatus[idx] = 'completed';
+        } else {
+          if (info.isNetworkError) networkErrors++;
+          nextStatus[idx] = 'error';
         }
+        return { cards: nextCards, rowStatus: nextStatus, done: completed };
+      });
+    };
 
-        // Gerar o cabeçalho da tabela a partir de getColumnDefs()
-        function renderTableHead() {
-            tableHeadRow.innerHTML = getColumnDefs()
-                .map(col => `<th style="width: ${col.width}px;">${col.label}</th>`)
-                .join('');
+    // 1) dedupe por nome completo
+    const nameToIndices = new Map();
+    indicesToFill.forEach(idx => {
+      const name = cards[idx].name;
+      if (!nameToIndices.has(name)) nameToIndices.set(name, []);
+      nameToIndices.get(name).push(idx);
+    });
+
+    // 2) agrupar pelo identificador de busca (face da frente)
+    const searchKeyToOriginalNames = new Map();
+    const searchKeys = [];
+    for (const originalName of nameToIndices.keys()) {
+      const searchKey = this.frontSearchName(originalName);
+      const norm = this.normalizeKey(searchKey);
+      if (!searchKeyToOriginalNames.has(norm)) { searchKeyToOriginalNames.set(norm, []); searchKeys.push(searchKey); }
+      searchKeyToOriginalNames.get(norm).push(originalName);
+    }
+
+    const foundByOriginalName = new Map();
+    const notFoundOriginalNames = [];
+
+    for (const chunk of this.chunkArray(searchKeys, 75)) {
+      try {
+        const result = await this.withResilience(() => this.fetchCollectionBatch(chunk), 'lote de cartas', onCooldown);
+        for (const card of result.found) {
+          const returnedKey = this.normalizeKey((card.card_faces && card.card_faces[0] && card.card_faces[0].name) || card.name);
+          const originalNames = searchKeyToOriginalNames.get(returnedKey);
+          if (!originalNames) { console.warn('Carta devolvida pelo lote não bateu com nenhum identificador enviado:', card.name); continue; }
+          for (const originalName of originalNames) foundByOriginalName.set(originalName, card);
         }
-
-        // Gerar as células de uma linha a partir de getColumnDefs() —
-        // usado tanto na renderização inicial quanto na atualização
-        // incremental durante o preenchimento
-        function buildRowCells(card) {
-            return getColumnDefs().map(col => {
-                const value = col.get(card);
-                const cls = col.cellClass ? ` class="${col.cellClass}"` : '';
-                return `<td${cls}>${value ? escapeHtml(value) : '<span class="empty-cell">—</span>'}</td>`;
-            }).join('');
+        for (const notFoundKey of result.notFound) {
+          notFoundOriginalNames.push(...(searchKeyToOriginalNames.get(this.normalizeKey(notFoundKey)) || []));
         }
-
-        // Renderizar tabela inicial
-        function renderTable() {
-            renderTableHead();
-
-            if (cardsData.length === 0) {
-                const colspan = getColumnDefs().length;
-                cardsBody.innerHTML = `<tr><td colspan="${colspan}" style="text-align: center; color: #ccc; padding: 40px;">Nenhuma carta carregada. Clique em "Carregar Planilha" para começar.</td></tr>`;
-                fillBtn.disabled = true;
-                downloadBtn.disabled = true;
-                return;
-            }
-
-            cardsBody.innerHTML = cardsData.map((card, idx) => `
-                <tr class="card-row" data-index="${idx}">
-                    ${buildRowCells(card)}
-                </tr>
-            `).join('');
-
-            // Verificar se há cartas para preencher
-            const hasCardsToFill = cardsData.some(card => card.type === null || card.description === null);
-            fillBtn.disabled = !hasCardsToFill;
-            downloadBtn.disabled = false;
+      } catch (e) {
+        console.error('Falha ao buscar lote de cartas:', e);
+        for (const searchKey of chunk) {
+          notFoundOriginalNames.push(...(searchKeyToOriginalNames.get(this.normalizeKey(searchKey)) || []));
         }
+      }
+      await this.delay(150);
+    }
 
-        // Aguardar um intervalo (usado para respeitar o rate limit da Scryfall)
-        function delay(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
+    const ptMap = new Map();
+    if (this.isPt()) {
+      const exactNames = [...new Set([...foundByOriginalName.values()].map(c => c.name))];
+      for (const chunk of this.chunkArray(exactNames, 10)) {
+        try {
+          const chunkPtMap = await this.withResilience(() => this.fetchPortugueseBatch(chunk), 'traduções em português', onCooldown);
+          chunkPtMap.forEach((v, k) => ptMap.set(k, v));
+        } catch (e) {
+          console.warn('Falha ao buscar traduções em português em lote:', e);
         }
-
-        // Se desligado, as cartas são preenchidas só com os dados em inglês
-        // (texto Oracle), pulando as requisições extras de tradução
-        function shouldSearchPortuguese() {
-            return ptToggle.checked;
-        }
-
-        // Fazer fetch na Scryfall com retry/backoff para erros transitórios
-        // (429/5xx). Falhas de rede/CORS (fetch rejeitando antes de existir
-        // uma resposta HTTP) só recebem uma tentativa extra rápida aqui —
-        // quando isso se repete, geralmente é um bloqueio temporário de
-        // alguns segundos no edge da Scryfall, e insistir rapidamente só
-        // desperdiça tentativas sem esperar o bloqueio passar. Quem trata
-        // essa espera de verdade é o circuit breaker em
-        // fetchCardWithResilience (mais abaixo).
-        // 404 é um "não encontrada" genuíno e não deve ser reprocessado.
-        async function fetchScryfall(url, options = {}, retries = 4) {
-            const networkRetries = 1;
-            for (let attempt = 0; attempt <= retries; attempt++) {
-                let response;
-                try {
-                    response = await fetch(url, options);
-                } catch (networkError) {
-                    if (attempt < networkRetries) {
-                        await delay(300 * (attempt + 1));
-                        continue;
-                    }
-                    // Esgotaram as tentativas: propagar como falha de rede/CORS,
-                    // distinta de uma carta genuinamente não encontrada
-                    const err = new Error('Falha de conexão com a Scryfall (rede/CORS)');
-                    err.isNetworkError = true;
-                    throw err;
-                }
-
-                if (response.ok || response.status === 404) {
-                    return response;
-                }
-
-                // 429 (rate limit) ou erro 5xx: aguardar e tentar novamente
-                if (attempt < retries) {
-                    const retryAfter = Number(response.headers.get('Retry-After'));
-                    const waitMs = retryAfter > 0 ? retryAfter * 1000 : 300 * (attempt + 1);
-                    await delay(waitMs);
-                    continue;
-                }
-
-                return response;
-            }
-        }
-
-        // Buscar informações da carta na API Scryfall (usado só como
-        // fallback fuzzy individual, para nomes que não bateram exato no
-        // lote — não mais um caminho dedicado a cartas "//")
-        async function fetchCardFromScryfall(cardName) {
-            try {
-                const response = await fetchScryfall(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardName)}`);
-
-                if (response.status === 404) {
-                    return {
-                        name: cardName,
-                        namePt: null,
-                        type: null,
-                        description: null,
-                        nameVerso: null,
-                        namePtVerso: null,
-                        typeVerso: null,
-                        descriptionVerso: null,
-                        power: null,
-                        mana: null,
-                        found: false,
-                        error: 'Carta não encontrada'
-                    };
-                }
-
-                if (!response.ok) {
-                    throw new Error(`Erro: ${response.status}`);
-                }
-
-                const data = await response.json();
-                let ptCard = null;
-
-                // Buscar a impressão em português (campos "printed_*" trazem o texto
-                // localizado; "oracle_text"/"type_line" são sempre o texto Oracle em
-                // inglês), só quando o usuário deixou a opção ligada
-                if (shouldSearchPortuguese()) {
-                    // Respeitar o rate limit da Scryfall antes da segunda requisição
-                    await delay(100);
-
-                    try {
-                        const exactName = data.name;
-                        const searchUrl = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${exactName}" lang:pt`)}&unique=prints`;
-                        const ptResponse = await fetchScryfall(searchUrl);
-
-                        if (ptResponse && ptResponse.ok) {
-                            const ptResult = await ptResponse.json();
-                            ptCard = (ptResult.data && ptResult.data[0]) || null;
-                        }
-                    } catch (e) {
-                        // Sem versão em português disponível: manter os dados em inglês
-                        console.warn(`Sem versão em português para ${cardName}:`, e);
-                    }
-                }
-
-                return { ...buildFaceInfo(data, ptCard), found: true };
-            } catch (error) {
-                console.error(`Erro ao buscar ${cardName}:`, error);
-                return {
-                    name: cardName,
-                    namePt: null,
-                    type: null,
-                    description: null,
-                    nameVerso: null,
-                    namePtVerso: null,
-                    typeVerso: null,
-                    descriptionVerso: null,
-                    power: null,
-                    mana: null,
-                    found: false,
-                    isNetworkError: !!error.isNetworkError,
-                    error: error.message
-                };
-            }
-        }
-
-        // Circuit breaker: quando a busca de uma carta falha por rede/CORS,
-        // normalmente é um bloqueio temporário (edge da Scryfall reagindo a
-        // um volume alto de requisições) que dura alguns segundos — não que
-        // a carta não exista. Em vez de desistir e passar para a próxima
-        // carta (o que só faz o app martelar o bloqueio em várias cartas
-        // seguidas até ele passar sozinho), esperamos de verdade e
-        // reprocessamos a MESMA carta antes de seguir em frente.
-        async function fetchCardWithResilience(cardName, onCooldown) {
-            const maxAttempts = 6;
-            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-                const info = await fetchCardFromScryfall(cardName);
-
-                if (!info.isNetworkError) {
-                    return info;
-                }
-
-                if (attempt >= maxAttempts) {
-                    return info;
-                }
-
-                // Primeira falha: pausa curta (pode ser só um soluço pontual).
-                // A partir da segunda falha seguida: pausa bem maior, para
-                // dar tempo real do bloqueio ser liberado.
-                const cooldownMs = attempt === 1 ? 1500 : 8000;
-                if (onCooldown) {
-                    onCooldown(cardName, cooldownMs, attempt);
-                }
-                await delay(cooldownMs);
-            }
-        }
-
-        // Divide um array em pedaços de tamanho fixo
-        function chunkArray(array, size) {
-            const chunks = [];
-            for (let i = 0; i < array.length; i += size) {
-                chunks.push(array.slice(i, i + size));
-            }
-            return chunks;
-        }
-
-        // Cartas de dupla face/split/modal DFC são escritas como
-        // "Frente // Verso". A Scryfall resolve o nome de uma única face
-        // (sem o "//") para a carta completa, então usamos só a parte da
-        // frente como identificador de busca — sem precisar de fuzzy.
-        function frontSearchName(name) {
-            const sepIndex = name.indexOf('//');
-            return sepIndex === -1 ? name : name.slice(0, sepIndex).trim();
-        }
-
-        // Normaliza uma string para comparação (usado só como chave de
-        // mapa — o texto original, com maiúsculas/espaços, continua sendo
-        // o que é exibido/enviado)
-        function normalizeKey(name) {
-            return name.trim().toLowerCase();
-        }
-
-        // Devolve os dados de uma face da carta. Cartas de dupla face têm
-        // um array card_faces com os dados de cada lado; cartas de face
-        // única não têm esse array — nesse caso a "frente" é o próprio
-        // objeto da carta, e não existe "verso" (índice 1 = null).
-        function getCardFace(card, index) {
-            if (card && Array.isArray(card.card_faces) && card.card_faces.length > index) {
-                return card.card_faces[index];
-            }
-            return index === 0 ? card : null;
-        }
-
-        // Monta o conjunto completo de campos (frente + verso, inglês + PT)
-        // a partir de uma carta da Scryfall e, opcionalmente, da mesma
-        // carta na tradução em português. Único lugar que interpreta
-        // card_faces — usado tanto na busca em lote quanto no fallback
-        // fuzzy individual.
-        function buildFaceInfo(data, ptCard) {
-            const frontFace = getCardFace(data, 0);
-            const backFace = getCardFace(data, 1); // null em cartas de face única
-
-            const name = frontFace.name || data.name;
-            let type = frontFace.type_line || '';
-            let description = frontFace.oracle_text || '';
-            const power = frontFace.power && frontFace.toughness ? `${frontFace.power}/${frontFace.toughness}` : '';
-            const mana = frontFace.mana_cost || '';
-
-            const nameVerso = backFace ? (backFace.name || null) : null;
-            let typeVerso = backFace ? (backFace.type_line || '') : null;
-            let descriptionVerso = backFace ? (backFace.oracle_text || '') : null;
-
-            let namePt = null;
-            let namePtVerso = null;
-
-            if (ptCard) {
-                // Não verificado ao vivo nesta sessão (sem acesso à API):
-                // assumindo que printed_name/printed_type_line/printed_text
-                // de uma carta multi-face em português ficam dentro de
-                // card_faces[i], no mesmo padrão do inglês. Se ao rodar
-                // contra a Scryfall real isso vier diferente para o verso
-                // especificamente, ajustar aqui.
-                const ptFrontFace = getCardFace(ptCard, 0);
-                const ptBackFace = getCardFace(ptCard, 1);
-
-                namePt = ptFrontFace.printed_name || null;
-                type = ptFrontFace.printed_type_line || type;
-                description = ptFrontFace.printed_text || description;
-
-                if (backFace) {
-                    namePtVerso = ptBackFace ? (ptBackFace.printed_name || null) : null;
-                    typeVerso = (ptBackFace && ptBackFace.printed_type_line) || typeVerso;
-                    descriptionVerso = (ptBackFace && ptBackFace.printed_text) || descriptionVerso;
-                }
-            }
-
-            return {
-                name, namePt, type, description,
-                nameVerso, namePtVerso, typeVerso, descriptionVerso,
-                power, mana
-            };
-        }
-
-        // Versão genérica do circuit breaker acima, para as chamadas em
-        // lote: reexecuta a função inteira após uma pausa real quando o
-        // erro é de rede/CORS; qualquer outro erro é propagado na hora.
-        async function withResilience(fn, label, onCooldown) {
-            const maxAttempts = 6;
-            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-                try {
-                    return await fn();
-                } catch (error) {
-                    if (!error.isNetworkError || attempt >= maxAttempts) {
-                        throw error;
-                    }
-                    const cooldownMs = attempt === 1 ? 1500 : 8000;
-                    if (onCooldown) {
-                        onCooldown(label, cooldownMs, attempt);
-                    }
-                    await delay(cooldownMs);
-                }
-            }
-        }
-
-        // Busca várias cartas de uma vez pelo endpoint de coleção da
-        // Scryfall (até 75 identificadores por chamada), em vez de uma
-        // requisição fuzzy por carta. Exige nomes exatos — nomes que não
-        // baterem voltam em "notFound" para tentativa individual depois.
-        async function fetchCollectionBatch(names) {
-            const identifiers = names.map(name => ({ name }));
-            const response = await fetchScryfall('https://api.scryfall.com/cards/collection', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ identifiers })
-            });
-
-            if (!response.ok) {
-                throw new Error(`Erro ao buscar lote de cartas: ${response.status}`);
-            }
-
-            const result = await response.json();
-            return {
-                found: result.data || [],
-                notFound: (result.not_found || []).map(identifier => identifier.name)
-            };
-        }
-
-        // Busca a tradução em português de várias cartas em uma única
-        // requisição, combinando os nomes exatos com "or" na query de
-        // busca da Scryfall (em vez de uma busca por carta).
-        async function fetchPortugueseBatch(names) {
-            const ptMap = new Map();
-            const escapedNames = names.map(name => name.replace(/"/g, '\\"'));
-            const query = escapedNames.map(name => `!"${name}"`).join(' or ');
-            const searchUrl = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(`(${query}) lang:pt`)}&unique=prints&order=released&dir=desc`;
-            const response = await fetchScryfall(searchUrl);
-
-            if (!response.ok) {
-                // Sem tradução disponível para este lote: os cards seguem em inglês
-                return ptMap;
-            }
-
-            const result = await response.json();
-            for (const card of (result.data || [])) {
-                // order=released&dir=desc garante que a primeira ocorrência de
-                // cada nome é a impressão em português mais recente
-                if (!ptMap.has(card.name)) {
-                    ptMap.set(card.name, card);
-                }
-            }
-            return ptMap;
-        }
-
-        // Monta o objeto de carta preenchida a partir dos dados em inglês
-        // (endpoint de coleção) e, se existir, da tradução em português.
-        // O nome em inglês nunca é sobrescrito — a tradução vai para namePt.
-        function buildCardInfo(data, ptMap) {
-            return { ...buildFaceInfo(data, ptMap.get(data.name) || null), found: true };
-        }
-
-        // Preencher as cartas
-        async function fillCards() {
-            const cardsToFill = cardsData.filter((card, idx) => {
-                return card.type === null || card.description === null;
-            });
-
-            if (cardsToFill.length === 0) {
-                showStatus('Todas as cartas já estão preenchidas!', 'success');
-                return;
-            }
-
-            fillBtn.disabled = true;
-            // Travar o switch durante o preenchimento: renderTable() (chamada
-            // pelo listener de "change") reconstrói a tabela inteira e
-            // apagaria as classes loading/completed/error no meio do processo
-            ptToggle.disabled = true;
-            progressContainer.style.display = 'block';
-            showStatus(`Preenchendo ${cardsToFill.length} carta(s)...`, 'info');
-
-            let completed = 0;
-            let networkErrors = 0;
-            const total = cardsToFill.length;
-
-            const onCooldown = (label, cooldownMs) => {
-                showStatus(
-                    `⏸️ Conexão com a Scryfall instável (${label}). Pausando ${Math.round(cooldownMs / 1000)}s antes de tentar novamente...`,
-                    'warning'
-                );
-            };
-
-            function applyResult(idx, info) {
-                const row = document.querySelector(`tr[data-index="${idx}"]`);
-                row.classList.remove('loading');
-
-                if (info.found) {
-                    // Descartar found/error/isNetworkError: são só sinalização
-                    // de transporte, não campos de carta — não devem grudar
-                    // em cardsData (que agora alimenta a exportação direto)
-                    const { found, error, isNetworkError, ...cleanInfo } = info;
-                    cardsData[idx] = { ...cardsData[idx], ...cleanInfo };
-                    row.classList.add('completed');
-                } else {
-                    if (info.isNetworkError) {
-                        networkErrors++;
-                    }
-                    row.classList.add('error');
-                }
-
-                row.innerHTML = buildRowCells(cardsData[idx]);
-
-                completed++;
-                progressFill.style.width = (completed / total * 100) + '%';
-                progressText.textContent = `${completed}/${total}`;
-            }
-
-            // Todas as cartas passam pela busca em lote agora — inclusive
-            // as de dupla face/split ("//"), buscadas só pelo nome da
-            // face da frente (exato, sem precisar de fuzzy). O fuzzy
-            // individual (fetchCardWithResilience) fica só como fallback
-            // pra nomes que não baterem exato no lote.
-            const indicesToFill = cardsToFill.map(card => cardsData.indexOf(card));
-            indicesToFill.forEach(idx => {
-                document.querySelector(`tr[data-index="${idx}"]`).classList.add('loading');
-            });
-
-            // 1) Agrupar por nome completo original (dedupe de linhas
-            //    idênticas) — é o nome completo que fica salvo em
-            //    cardsData e é usado no fallback fuzzy caso precise
-            const nameToIndices = new Map();
-            indicesToFill.forEach(idx => {
-                const name = cardsData[idx].name;
-                if (!nameToIndices.has(name)) {
-                    nameToIndices.set(name, []);
-                }
-                nameToIndices.get(name).push(idx);
-            });
-            const uniqueNames = [...nameToIndices.keys()];
-
-            // 2) Agrupar os nomes completos únicos pelo identificador de
-            //    busca (nome da frente, truncado em "//") — é isso que
-            //    de fato vai pro endpoint de lote
-            const searchKeyToOriginalNames = new Map(); // chave normalizada -> [nomes completos]
-            const searchKeys = [];
-            for (const originalName of uniqueNames) {
-                const searchKey = frontSearchName(originalName);
-                const norm = normalizeKey(searchKey);
-                if (!searchKeyToOriginalNames.has(norm)) {
-                    searchKeyToOriginalNames.set(norm, []);
-                    searchKeys.push(searchKey);
-                }
-                searchKeyToOriginalNames.get(norm).push(originalName);
-            }
-
-            const foundByOriginalName = new Map();
-            const notFoundOriginalNames = [];
-
-            for (const chunk of chunkArray(searchKeys, 75)) {
-                try {
-                    const result = await withResilience(
-                        () => fetchCollectionBatch(chunk),
-                        'lote de cartas',
-                        onCooldown
-                    );
-
-                    // Casar a carta devolvida de volta aos nomes originais
-                    // pelo conteúdo (recalculando a mesma chave de busca a
-                    // partir da resposta), não pela posição na resposta —
-                    // não há garantia confirmada de que a ordem da resposta
-                    // bate com a da requisição
-                    for (const card of result.found) {
-                        const returnedKey = normalizeKey((card.card_faces && card.card_faces[0] && card.card_faces[0].name) || card.name);
-                        const originalNames = searchKeyToOriginalNames.get(returnedKey);
-                        if (!originalNames) {
-                            console.warn('Carta devolvida pelo lote não bateu com nenhum identificador enviado:', card.name);
-                            continue;
-                        }
-                        for (const originalName of originalNames) {
-                            foundByOriginalName.set(originalName, card);
-                        }
-                    }
-
-                    for (const notFoundKey of result.notFound) {
-                        const originalNames = searchKeyToOriginalNames.get(normalizeKey(notFoundKey)) || [];
-                        notFoundOriginalNames.push(...originalNames);
-                    }
-                } catch (e) {
-                    console.error('Falha ao buscar lote de cartas:', e);
-                    for (const searchKey of chunk) {
-                        notFoundOriginalNames.push(...(searchKeyToOriginalNames.get(normalizeKey(searchKey)) || []));
-                    }
-                }
-                await delay(150);
-            }
-
-            // Traduções em português em lote, usando os nomes exatos
-            // devolvidos pela Scryfall (para casar corretamente) — só
-            // quando o usuário deixou a opção ligada
-            const ptMap = new Map();
-            if (shouldSearchPortuguese()) {
-                const exactNames = [...new Set([...foundByOriginalName.values()].map(card => card.name))];
-                for (const chunk of chunkArray(exactNames, 10)) {
-                    try {
-                        const chunkPtMap = await withResilience(
-                            () => fetchPortugueseBatch(chunk),
-                            'traduções em português',
-                            onCooldown
-                        );
-                        chunkPtMap.forEach((value, key) => ptMap.set(key, value));
-                    } catch (e) {
-                        // Sem tradução disponível para este lote: seguem em inglês
-                        console.warn('Falha ao buscar traduções em português em lote:', e);
-                    }
-                    await delay(150);
-                }
-            }
-
-            for (const [originalName, data] of foundByOriginalName) {
-                const info = buildCardInfo(data, ptMap);
-                for (const idx of nameToIndices.get(originalName)) {
-                    applyResult(idx, info);
-                }
-            }
-
-            // Nomes que não bateram exato no lote: tentar individualmente
-            // via busca fuzzy (com o nome completo original, não o
-            // truncado — o fuzzy da Scryfall já lida bem com "//") antes
-            // de desistir de vez
-            for (const originalName of notFoundOriginalNames) {
-                const info = await fetchCardWithResilience(originalName, onCooldown);
-                for (const idx of nameToIndices.get(originalName)) {
-                    applyResult(idx, info);
-                }
-                await delay(100);
-            }
-
-            progressContainer.style.display = 'none';
-            ptToggle.disabled = false;
-
-            // Verificar se ainda há cartas a preencher
-            const hasCardsToFill = cardsData.some(card => card.type === null || card.description === null);
-            fillBtn.disabled = hasCardsToFill;
-            downloadBtn.disabled = false;
-
-            if (networkErrors > 0) {
-                showStatus(
-                    `⚠️ Erro de conexão persistente com a Scryfall em ${networkErrors} carta(s) mesmo após novas tentativas com pausas (não é que elas não existam). Aguarde um pouco mais e clique em "Preencher Cartas" novamente.`,
-                    'error'
-                );
-            } else if (hasCardsToFill) {
-                showStatus('⚠️ Algumas cartas não foram encontradas na API Scryfall. Verifique se o nome está correto.', 'warning');
-            } else {
-                showStatus('✅ Todas as cartas foram preenchidas com sucesso!', 'success');
-            }
-        }
-
-        // Mostrar mensagem de status
-        function showStatus(message, type = 'info') {
-            statusEl.textContent = message;
-            statusEl.className = `status show ${type}`;
-            setTimeout(() => {
-                if (type !== 'error' && type !== 'warning') {
-                    statusEl.classList.remove('show');
-                }
-            }, 5000);
-        }
-
-        // Escape HTML
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        // Carregar planilha
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    if (file.name.endsWith('.csv')) {
-                        parseCSV(e.target.result);
-                    } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-                        parseExcel(e.target.result);
-                    } else {
-                        showStatus('Formato de arquivo não suportado. Use CSV ou XLSX.', 'error');
-                    }
-                } catch (error) {
-                    showStatus(`Erro ao processar arquivo: ${error.message}`, 'error');
-                    console.error(error);
-                }
-            };
-
-            if (file.name.endsWith('.csv')) {
-                reader.readAsText(file);
-            } else {
-                reader.readAsArrayBuffer(file);
-            }
-
-            // Limpar o input para permitir carregar o mesmo arquivo novamente
-            fileInput.value = '';
-        }
-
-        // Parse CSV
-        function parseCSV(csvText) {
-            const lines = csvText.trim().split('\n');
-            if (lines.length === 0) {
-                showStatus('Arquivo CSV vazio.', 'warning');
-                return;
-            }
-
-            const loadedCards = [];
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (line) {
-                    loadedCards.push({ name: line, namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null });
-                }
-            }
-
-            if (loadedCards.length === 0) {
-                showStatus('Nenhuma carta encontrada no arquivo.', 'warning');
-                return;
-            }
-
-            cardsData.length = 0;
-            cardsData.push(...loadedCards);
-            renderTable();
-            fillBtn.disabled = false;
-            showStatus(`✅ ${loadedCards.length} carta(s) carregada(s) com sucesso!`, 'success');
-        }
-
-        // Parse Excel
-        async function parseExcel(arrayBuffer) {
-            try {
-                await loadXlsxLibrary();
-
-                if (!window.XLSX) {
-                    showStatus('Erro: Biblioteca XLSX não disponível após tentativas de carregamento.', 'error');
-                    return;
-                }
-
-                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-                if (rows.length === 0) {
-                    showStatus('Arquivo Excel vazio.', 'warning');
-                    return;
-                }
-
-                const loadedCards = [];
-                for (let i = 0; i < rows.length; i++) {
-                    const row = rows[i];
-                    if (row && row[0]) {
-                        loadedCards.push({
-                            name: String(row[0]).trim(),
-                            namePt: null,
-                            type: null,
-                            description: null,
-                            nameVerso: null,
-                            namePtVerso: null,
-                            typeVerso: null,
-                            descriptionVerso: null,
-                            power: null,
-                            mana: null
-                        });
-                    }
-                }
-
-                if (loadedCards.length === 0) {
-                    showStatus('Nenhuma carta encontrada no arquivo.', 'warning');
-                    return;
-                }
-
-                cardsData.length = 0;
-                cardsData.push(...loadedCards);
-                renderTable();
-                showStatus(`✅ ${loadedCards.length} carta(s) carregada(s) com sucesso!`, 'success');
-            } catch (error) {
-                showStatus(`Erro ao processar Excel: ${error.message}`, 'error');
-                console.error('Erro ao carregar Excel:', error);
-            }
-        }
-
-        // Event listeners
-        loadBtn.addEventListener('click', () => {
-            fileInput.click();
-        });
-
-        fileInput.addEventListener('change', handleFileSelect);
-
-        fillBtn.addEventListener('click', fillCards);
-
-        // Alternar o switch de PT-BR reflete na hora nas colunas da tabela
-        // (namePt já fica salvo em cardsData independente do estado do
-        // switch, então isso não refaz nenhuma requisição)
-        ptToggle.addEventListener('change', () => {
-            renderTable();
-        });
-
-        clearBtn.addEventListener('click', () => {
-            if (confirm('Tem certeza que deseja limpar todos os dados?')) {
-                location.reload();
-            }
-        });
-
-        downloadBtn.addEventListener('click', () => {
-            downloadAsExcel();
-        });
-
-        // Monta o cabeçalho + linhas da planilha a partir de getColumnDefs(),
-        // espelhando exatamente as colunas exibidas na tela (inclusive
-        // Nome original / Nome em português quando a tradução está ligada)
-        function buildExportAoA() {
-            const columns = getColumnDefs();
-            const headers = columns.map(col => col.label);
-            const rows = cardsData.map(card => columns.map(col => col.get(card) || ''));
-            return [headers, ...rows];
-        }
-
-        // Baixar como Excel
-        async function downloadAsExcel() {
-            if (cardsData.length === 0) {
-                showStatus('Nenhuma carta para baixar.', 'warning');
-                return;
-            }
-
-            try {
-                await loadXlsxLibrary();
-
-                if (!window.XLSX) {
-                    showStatus('Erro: Biblioteca XLSX não disponível após tentativas de carregamento.', 'error');
-                    return;
-                }
-
-                const ws = XLSX.utils.aoa_to_sheet(buildExportAoA());
-                // Ativa as setinhas de filtro/ordenação do Excel no cabeçalho.
-                // Observação: a descrição já sai com as quebras de parágrafo
-                // (\n) corretas dentro da célula, mas a biblioteca gratuita
-                // usada aqui (SheetJS Community Edition) não escreve estilo
-                // de célula — para VER essas quebras no Excel, é preciso
-                // selecionar a coluna e ativar "Quebrar Texto Automaticamente"
-                // manualmente (Formatar > Célula > Alinhamento).
-                ws['!autofilter'] = { ref: ws['!ref'] };
-
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, 'Cartas');
-                XLSX.writeFile(wb, 'Junkook_Deck_Preenchido.xlsx');
-                showStatus('✅ Arquivo baixado com sucesso!', 'success');
-            } catch (error) {
-                showStatus(`Erro ao baixar arquivo: ${error.message}`, 'error');
-                console.error('Erro ao baixar Excel:', error);
-            }
-        }
-
-        // Inicializar
-        renderTable();
-    </script>
+        await this.delay(150);
+      }
+    }
+
+    for (const [originalName, data] of foundByOriginalName) {
+      const info = { ...this.buildFaceInfo(data, ptMap.get(data.name) || null), found: true };
+      for (const idx of nameToIndices.get(originalName)) applyResult(idx, info);
+    }
+
+    for (const originalName of notFoundOriginalNames) {
+      const info = await this.fetchCardWithResilience(originalName, onCooldown);
+      for (const idx of nameToIndices.get(originalName)) applyResult(idx, info);
+      await this.delay(100);
+    }
+
+    this.setState({ filling: false });
+    const hasCardsToFill = this.state.cards.some(c => c.type === null || c.description === null);
+
+    if (networkErrors > 0) {
+      this.showStatus(`Erro de conexão persistente com a Scryfall em ${networkErrors} carta(s) mesmo após novas tentativas com pausas (não é que elas não existam). Aguarde um pouco mais e clique em “Preencher cartas” novamente.`, 'error');
+    } else if (hasCardsToFill) {
+      this.showStatus('Algumas cartas não foram encontradas na API Scryfall. Verifique se o nome está correto.', 'warning');
+    } else {
+      this.showStatus('Todas as cartas foram preenchidas com sucesso!', 'success');
+    }
+  }
+
+  // ---------- arquivos ----------
+  handleFileSelect(event) {
+    const input = event.target;
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        if (file.name.endsWith('.csv')) this.parseCSV(e.target.result);
+        else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) this.parseExcel(e.target.result);
+        else this.showStatus('Formato de arquivo não suportado. Use CSV ou XLSX.', 'error');
+      } catch (error) {
+        this.showStatus(`Erro ao processar arquivo: ${error.message}`, 'error');
+        console.error(error);
+      }
+    };
+    if (file.name.endsWith('.csv')) reader.readAsText(file);
+    else reader.readAsArrayBuffer(file);
+    input.value = '';
+  }
+
+  emptyCard(name) {
+    return { name, namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null };
+  }
+
+  parseCSV(csvText) {
+    const lines = csvText.trim().split('\n');
+    if (lines.length === 0) { this.showStatus('Arquivo CSV vazio.', 'warning'); return; }
+    const loaded = lines.map(l => l.trim()).filter(Boolean).map(l => this.emptyCard(l));
+    if (loaded.length === 0) { this.showStatus('Nenhuma carta encontrada no arquivo.', 'warning'); return; }
+    this.setState({ cards: loaded, rowStatus: {} });
+    this.showStatus(`${loaded.length} carta(s) carregada(s) com sucesso!`, 'success');
+  }
+
+  async parseExcel(arrayBuffer) {
+    try {
+      await this.loadXlsxLibrary();
+      if (!window.XLSX) { this.showStatus('Erro: Biblioteca XLSX não disponível após tentativas de carregamento.', 'error'); return; }
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      if (rows.length === 0) { this.showStatus('Arquivo Excel vazio.', 'warning'); return; }
+      const loaded = rows.filter(r => r && r[0]).map(r => this.emptyCard(String(r[0]).trim()));
+      if (loaded.length === 0) { this.showStatus('Nenhuma carta encontrada no arquivo.', 'warning'); return; }
+      this.setState({ cards: loaded, rowStatus: {} });
+      this.showStatus(`${loaded.length} carta(s) carregada(s) com sucesso!`, 'success');
+    } catch (error) {
+      this.showStatus(`Erro ao processar Excel: ${error.message}`, 'error');
+      console.error('Erro ao carregar Excel:', error);
+    }
+  }
+
+  buildExportAoA() {
+    const columns = this.columns();
+    return [columns.map(c => c.label), ...this.state.cards.map(card => columns.map(c => c.get(card) || ''))];
+  }
+
+  async downloadAsExcel() {
+    if (this.state.cards.length === 0) { this.showStatus('Nenhuma carta para baixar.', 'warning'); return; }
+    try {
+      await this.loadXlsxLibrary();
+      if (!window.XLSX) { this.showStatus('Erro: Biblioteca XLSX não disponível após tentativas de carregamento.', 'error'); return; }
+      const ws = XLSX.utils.aoa_to_sheet(this.buildExportAoA());
+      ws['!autofilter'] = { ref: ws['!ref'] };
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Cartas');
+      XLSX.writeFile(wb, 'Junkook_Deck_Preenchido.xlsx');
+      this.showStatus('Arquivo baixado com sucesso!', 'success');
+    } catch (error) {
+      this.showStatus(`Erro ao baixar arquivo: ${error.message}`, 'error');
+      console.error('Erro ao baixar Excel:', error);
+    }
+  }
+
+  // ---------- render ----------
+  render() {
+    const columns = this.columns();
+    const cards = this.state.cards;
+    const filling = this.state.filling;
+    const pt = this.isPt();
+    const st = this.state.status;
+
+    // Cabeçalhos
+    const headRow = document.getElementById('headRow');
+    headRow.innerHTML = '';
+    for (const col of columns) {
+      const th = document.createElement('th');
+      th.style.cssText = `padding: 14px 16px; text-align: left; font-family: 'Cinzel', Georgia, serif; font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: #241606; border-bottom: 1px solid rgba(63,44,18,0.4); white-space: nowrap; width: ${col.width}px;`;
+      th.textContent = col.label;
+      headRow.appendChild(th);
+    }
+
+    // Linhas
+    const rowBg = {
+      loading: 'rgba(201,162,39,0.22)',
+      completed: 'rgba(46,110,64,0.18)',
+      error: 'rgba(150,40,30,0.18)'
+    };
+    const bodyRows = document.getElementById('bodyRows');
+    bodyRows.innerHTML = '';
+    cards.forEach((card, idx) => {
+      const tr = document.createElement('tr');
+      tr.style.cssText = `background: ${rowBg[this.state.rowStatus[idx]] || 'transparent'}; border-bottom: 1px solid rgba(63,44,18,0.24);`;
+      for (const col of columns) {
+        const td = document.createElement('td');
+        const value = col.get(card);
+        td.style.cssText = this.cellStyle(col.kind, !value);
+        td.textContent = value ? value : '—';
+        tr.appendChild(td);
+      }
+      bodyRows.appendChild(tr);
+    });
+
+    document.getElementById('emptyMsg').style.display = cards.length === 0 ? 'block' : 'none';
+
+    // Botões
+    const hasCardsToFill = cards.some(c => c.type === null || c.description === null);
+    const btnFill = document.getElementById('btnFill');
+    btnFill.disabled = filling || !hasCardsToFill;
+    btnFill.style.opacity = (filling || !hasCardsToFill) ? 0.35 : 1;
+    const btnDownload = document.getElementById('btnDownload');
+    btnDownload.disabled = cards.length === 0;
+    btnDownload.style.opacity = cards.length === 0 ? 0.35 : 1;
+
+    // Switch PT-BR
+    document.getElementById('ptSwitch').style.background = pt ? 'rgba(201,162,39,0.55)' : '#221e18';
+    const knob = document.getElementById('ptKnob');
+    knob.style.background = pt ? '#f4ead2' : '#6f6757';
+    knob.style.transform = pt ? 'translateX(22px)' : 'translateX(0)';
+
+    // Status
+    const statusBox = document.getElementById('statusBox');
+    if (st) {
+      const statusTone = {
+        info: ['#c9a227', 'rgba(201,162,39,0.07)', '#f0e4bf'],
+        success: ['#4e8c62', 'rgba(78,140,98,0.09)', '#d9f0dd'],
+        warning: ['#c99a27', 'rgba(201,154,39,0.09)', '#f5e2b4'],
+        error: ['#ad3626', 'rgba(173,54,38,0.10)', '#f8d0c6']
+      };
+      const tone = statusTone[st.type] || statusTone.info;
+      statusBox.style.display = 'block';
+      statusBox.style.borderLeft = `2px solid ${tone[0]}`;
+      statusBox.style.background = tone[1];
+      statusBox.style.color = tone[2];
+      statusBox.textContent = st.message;
+    } else {
+      statusBox.style.display = 'none';
+    }
+
+    // Progresso
+    const progressBox = document.getElementById('progressBox');
+    if (filling) {
+      progressBox.style.display = 'block';
+      document.getElementById('progressBar').style.width = this.state.total ? (this.state.done / this.state.total * 100) + '%' : '0%';
+      document.getElementById('progressText').textContent = `${this.state.done}/${this.state.total}`;
+    } else {
+      progressBox.style.display = 'none';
+    }
+  }
+}
+
+new App();
+</script>
 </body>
 </html>

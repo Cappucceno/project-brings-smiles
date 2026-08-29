@@ -259,6 +259,63 @@
             font-size: 0.85em;
             margin-right: 4px;
         }
+
+        .option-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .switch-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background-color: #ccc;
+            border-radius: 24px;
+            transition: background-color 0.2s ease;
+        }
+
+        .switch-slider::before {
+            content: "";
+            position: absolute;
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+        }
+
+        .switch input:checked + .switch-slider {
+            background-color: #28a745;
+        }
+
+        .switch input:checked + .switch-slider::before {
+            transform: translateX(20px);
+        }
+
+        .option-toggle label.option-label {
+            font-size: 0.95em;
+            color: #333;
+            cursor: pointer;
+            user-select: none;
+        }
     </style>
 </head>
 <body>
@@ -274,6 +331,14 @@
                 <button class="btn-success" id="fillBtn" disabled>🔄 Preencher Cartas</button>
                 <button class="btn-secondary" id="downloadBtn" disabled>⬇️ Baixar Excel</button>
                 <button class="btn-secondary" id="clearBtn">🗑️ Limpar</button>
+            </div>
+
+            <div class="option-toggle">
+                <label class="switch">
+                    <input type="checkbox" id="ptToggle" checked>
+                    <span class="switch-slider"></span>
+                </label>
+                <label for="ptToggle" class="option-label">Buscar cartas em PT-BR se tiver disponibilidade</label>
             </div>
 
             <div id="statusMessage" class="status"></div>
@@ -324,6 +389,7 @@
         const fillBtn = document.getElementById('fillBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const clearBtn = document.getElementById('clearBtn');
+        const ptToggle = document.getElementById('ptToggle');
         const cardsBody = document.getElementById('cardsBody');
         const progressContainer = document.getElementById('progressContainer');
         const progressFill = document.getElementById('progressFill');
@@ -415,6 +481,12 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
+        // Se desligado, as cartas são preenchidas só com os dados em inglês
+        // (texto Oracle), pulando as requisições extras de tradução
+        function shouldSearchPortuguese() {
+            return ptToggle.checked;
+        }
+
         // Fazer fetch na Scryfall com retry/backoff para erros transitórios
         // (429/5xx). Falhas de rede/CORS (fetch rejeitando antes de existir
         // uma resposta HTTP) só recebem uma tentativa extra rápida aqui —
@@ -488,29 +560,32 @@
                 const power = data.power && data.toughness ? `${data.power}/${data.toughness}` : '';
                 const mana = data.mana_cost || '';
 
-                // Respeitar o rate limit da Scryfall antes da segunda requisição
-                await delay(100);
-
                 // Buscar a impressão em português (campos "printed_*" trazem o texto
-                // localizado; "oracle_text"/"type_line" são sempre o texto Oracle em inglês)
-                try {
-                    const exactName = data.name;
-                    const searchUrl = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${exactName}" lang:pt`)}&unique=prints`;
-                    const ptResponse = await fetchScryfall(searchUrl);
+                // localizado; "oracle_text"/"type_line" são sempre o texto Oracle em
+                // inglês), só quando o usuário deixou a opção ligada
+                if (shouldSearchPortuguese()) {
+                    // Respeitar o rate limit da Scryfall antes da segunda requisição
+                    await delay(100);
 
-                    if (ptResponse && ptResponse.ok) {
-                        const ptResult = await ptResponse.json();
-                        const ptCard = ptResult.data && ptResult.data[0];
+                    try {
+                        const exactName = data.name;
+                        const searchUrl = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${exactName}" lang:pt`)}&unique=prints`;
+                        const ptResponse = await fetchScryfall(searchUrl);
 
-                        if (ptCard) {
-                            name = ptCard.printed_name || name;
-                            type = ptCard.printed_type_line || type;
-                            description = ptCard.printed_text || description;
+                        if (ptResponse && ptResponse.ok) {
+                            const ptResult = await ptResponse.json();
+                            const ptCard = ptResult.data && ptResult.data[0];
+
+                            if (ptCard) {
+                                name = ptCard.printed_name || name;
+                                type = ptCard.printed_type_line || type;
+                                description = ptCard.printed_text || description;
+                            }
                         }
+                    } catch (e) {
+                        // Sem versão em português disponível: manter os dados em inglês
+                        console.warn(`Sem versão em português para ${cardName}:`, e);
                     }
-                } catch (e) {
-                    // Sem versão em português disponível: manter os dados em inglês
-                    console.warn(`Sem versão em português para ${cardName}:`, e);
                 }
 
                 return {
@@ -778,22 +853,25 @@
                 }
 
                 // Traduções em português em lote, usando os nomes exatos
-                // devolvidos pela Scryfall (para casar corretamente)
-                const exactNames = [...foundByName.values()].map(card => card.name);
+                // devolvidos pela Scryfall (para casar corretamente) — só
+                // quando o usuário deixou a opção ligada
                 const ptMap = new Map();
-                for (const chunk of chunkArray(exactNames, 10)) {
-                    try {
-                        const chunkPtMap = await withResilience(
-                            () => fetchPortugueseBatch(chunk),
-                            'traduções em português',
-                            onCooldown
-                        );
-                        chunkPtMap.forEach((value, key) => ptMap.set(key, value));
-                    } catch (e) {
-                        // Sem tradução disponível para este lote: seguem em inglês
-                        console.warn('Falha ao buscar traduções em português em lote:', e);
+                if (shouldSearchPortuguese()) {
+                    const exactNames = [...foundByName.values()].map(card => card.name);
+                    for (const chunk of chunkArray(exactNames, 10)) {
+                        try {
+                            const chunkPtMap = await withResilience(
+                                () => fetchPortugueseBatch(chunk),
+                                'traduções em português',
+                                onCooldown
+                            );
+                            chunkPtMap.forEach((value, key) => ptMap.set(key, value));
+                        } catch (e) {
+                            // Sem tradução disponível para este lote: seguem em inglês
+                            console.warn('Falha ao buscar traduções em português em lote:', e);
+                        }
+                        await delay(150);
                     }
-                    await delay(150);
                 }
 
                 for (const [name, data] of foundByName) {

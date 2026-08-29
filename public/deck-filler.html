@@ -248,6 +248,7 @@
             overflow-y: auto;
             word-break: break-word;
             line-height: 1.4;
+            white-space: pre-line;
         }
 
         .tag {
@@ -346,7 +347,7 @@
             <div class="table-wrapper">
                 <table id="cardsTable">
                     <thead>
-                        <tr>
+                        <tr id="tableHeadRow">
                             <th style="width: 200px;">Nome</th>
                             <th style="width: 250px;">Tipo</th>
                             <th style="width: 400px;">Descrição da Carta</th>
@@ -377,11 +378,11 @@
     <script>
         // Dados da planilha
         const cardsData = [
-            { name: 'Arahbo, Roar of the World', type: 'Criatura Lendária — Felino Avatar', description: 'Eminência — No início do combate no seu turno, se Arahbo, Rugido do Mundo, estiver na zona de comando ou no campo de batalha, outro Felino alvo que você controla recebe +3/+3 até o final do turno.\n\nToda vez que outro Felino que você controla ataca, você pode pagar {1}{G}{W}. Se fizer isso, ele ganha atropelar e recebe +X/+X até o final do turno, sendo X seu poder.', power: '5/5', mana: '{3}{G}{W}' },
-            { name: 'Arahbo, the First Fang', type: null, description: null, power: null, mana: null },
-            { name: 'Hungry Lynx', type: null, description: null, power: null, mana: null },
-            { name: 'Jazal Goldmane', type: null, description: null, power: null, mana: null },
-            { name: 'Kaheera, the Orphanguard', type: null, description: null, power: null, mana: null },
+            { name: 'Arahbo, Roar of the World', namePt: null, type: 'Criatura Lendária — Felino Avatar', description: 'Eminência — No início do combate no seu turno, se Arahbo, Rugido do Mundo, estiver na zona de comando ou no campo de batalha, outro Felino alvo que você controla recebe +3/+3 até o final do turno.\n\nToda vez que outro Felino que você controla ataca, você pode pagar {1}{G}{W}. Se fizer isso, ele ganha atropelar e recebe +X/+X até o final do turno, sendo X seu poder.', power: '5/5', mana: '{3}{G}{W}' },
+            { name: 'Arahbo, the First Fang', namePt: null, type: null, description: null, power: null, mana: null },
+            { name: 'Hungry Lynx', namePt: null, type: null, description: null, power: null, mana: null },
+            { name: 'Jazal Goldmane', namePt: null, type: null, description: null, power: null, mana: null },
+            { name: 'Kaheera, the Orphanguard', namePt: null, type: null, description: null, power: null, mana: null },
         ];
 
         const statusEl = document.getElementById('statusMessage');
@@ -390,6 +391,7 @@
         const downloadBtn = document.getElementById('downloadBtn');
         const clearBtn = document.getElementById('clearBtn');
         const ptToggle = document.getElementById('ptToggle');
+        const tableHeadRow = document.getElementById('tableHeadRow');
         const cardsBody = document.getElementById('cardsBody');
         const progressContainer = document.getElementById('progressContainer');
         const progressFill = document.getElementById('progressFill');
@@ -451,10 +453,55 @@
             });
         }
 
+        // Definição das colunas da tabela (e, por extensão, da planilha
+        // exportada) — "Nome" vira "Nome original" + "Nome em português"
+        // quando a tradução estiver ligada, uma única coluna "Nome" quando
+        // estiver desligada. Fonte única usada pelo cabeçalho, pelas linhas
+        // e pela exportação em Excel, para nunca ficarem fora de sincronia.
+        function getColumnDefs() {
+            const nameColumns = shouldSearchPortuguese()
+                ? [
+                    { label: 'Nome original', width: 170, cellClass: 'card-name', get: card => card.name },
+                    { label: 'Nome em português', width: 170, cellClass: 'card-name', get: card => card.namePt },
+                ]
+                : [
+                    { label: 'Nome', width: 200, cellClass: 'card-name', get: card => card.name },
+                ];
+
+            return [
+                ...nameColumns,
+                { label: 'Tipo', width: 250, cellClass: 'card-info', get: card => card.type },
+                { label: 'Descrição da Carta', width: 400, cellClass: 'card-info', get: card => card.description },
+                { label: 'Poder e Resistência', width: 120, cellClass: '', get: card => card.power },
+                { label: 'Custo de Mana', width: 120, cellClass: '', get: card => card.mana },
+            ];
+        }
+
+        // Gerar o cabeçalho da tabela a partir de getColumnDefs()
+        function renderTableHead() {
+            tableHeadRow.innerHTML = getColumnDefs()
+                .map(col => `<th style="width: ${col.width}px;">${col.label}</th>`)
+                .join('');
+        }
+
+        // Gerar as células de uma linha a partir de getColumnDefs() —
+        // usado tanto na renderização inicial quanto na atualização
+        // incremental durante o preenchimento
+        function buildRowCells(card) {
+            return getColumnDefs().map(col => {
+                const value = col.get(card);
+                const cls = col.cellClass ? ` class="${col.cellClass}"` : '';
+                return `<td${cls}>${value ? escapeHtml(value) : '<span class="empty-cell">—</span>'}</td>`;
+            }).join('');
+        }
+
         // Renderizar tabela inicial
         function renderTable() {
+            renderTableHead();
+
             if (cardsData.length === 0) {
-                cardsBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #ccc; padding: 40px;">Nenhuma carta carregada. Clique em "Carregar Planilha" para começar.</td></tr>';
+                const colspan = getColumnDefs().length;
+                cardsBody.innerHTML = `<tr><td colspan="${colspan}" style="text-align: center; color: #ccc; padding: 40px;">Nenhuma carta carregada. Clique em "Carregar Planilha" para começar.</td></tr>`;
                 fillBtn.disabled = true;
                 downloadBtn.disabled = true;
                 return;
@@ -462,11 +509,7 @@
 
             cardsBody.innerHTML = cardsData.map((card, idx) => `
                 <tr class="card-row" data-index="${idx}">
-                    <td class="card-name">${escapeHtml(card.name)}</td>
-                    <td class="card-info">${card.type ? escapeHtml(card.type) : '<span class="empty-cell">—</span>'}</td>
-                    <td class="card-info">${card.description ? escapeHtml(card.description) : '<span class="empty-cell">—</span>'}</td>
-                    <td>${card.power ? escapeHtml(card.power) : '<span class="empty-cell">—</span>'}</td>
-                    <td>${card.mana ? escapeHtml(card.mana) : '<span class="empty-cell">—</span>'}</td>
+                    ${buildRowCells(card)}
                 </tr>
             `).join('');
 
@@ -538,6 +581,7 @@
                 if (response.status === 404) {
                     return {
                         name: cardName,
+                        namePt: null,
                         type: null,
                         description: null,
                         power: null,
@@ -553,8 +597,10 @@
 
                 const data = await response.json();
 
-                // Dados em inglês (texto Oracle canônico) como base/fallback
-                let name = data.name || cardName;
+                // Nome em inglês (Oracle) — nunca é sobrescrito, mesmo quando
+                // uma tradução em português é encontrada
+                const name = data.name || cardName;
+                let namePt = null;
                 let type = data.type_line || '';
                 let description = data.oracle_text || '';
                 const power = data.power && data.toughness ? `${data.power}/${data.toughness}` : '';
@@ -577,7 +623,7 @@
                             const ptCard = ptResult.data && ptResult.data[0];
 
                             if (ptCard) {
-                                name = ptCard.printed_name || name;
+                                namePt = ptCard.printed_name || null;
                                 type = ptCard.printed_type_line || type;
                                 description = ptCard.printed_text || description;
                             }
@@ -590,6 +636,7 @@
 
                 return {
                     name,
+                    namePt,
                     type,
                     description,
                     power,
@@ -600,6 +647,7 @@
                 console.error(`Erro ao buscar ${cardName}:`, error);
                 return {
                     name: cardName,
+                    namePt: null,
                     type: null,
                     description: null,
                     power: null,
@@ -722,9 +770,11 @@
         }
 
         // Monta o objeto de carta preenchida a partir dos dados em inglês
-        // (endpoint de coleção) e, se existir, da tradução em português
+        // (endpoint de coleção) e, se existir, da tradução em português.
+        // O nome em inglês nunca é sobrescrito — a tradução vai para namePt.
         function buildCardInfo(data, ptMap) {
-            let name = data.name;
+            const name = data.name;
+            let namePt = null;
             let type = data.type_line || '';
             let description = data.oracle_text || '';
             const power = data.power && data.toughness ? `${data.power}/${data.toughness}` : '';
@@ -732,12 +782,12 @@
 
             const ptCard = ptMap.get(data.name);
             if (ptCard) {
-                name = ptCard.printed_name || name;
+                namePt = ptCard.printed_name || null;
                 type = ptCard.printed_type_line || type;
                 description = ptCard.printed_text || description;
             }
 
-            return { name, type, description, power, mana, found: true };
+            return { name, namePt, type, description, power, mana, found: true };
         }
 
         // Preencher as cartas
@@ -752,6 +802,10 @@
             }
 
             fillBtn.disabled = true;
+            // Travar o switch durante o preenchimento: renderTable() (chamada
+            // pelo listener de "change") reconstrói a tabela inteira e
+            // apagaria as classes loading/completed/error no meio do processo
+            ptToggle.disabled = true;
             progressContainer.style.display = 'block';
             showStatus(`Preenchendo ${cardsToFill.length} carta(s)...`, 'info');
 
@@ -771,7 +825,11 @@
                 row.classList.remove('loading');
 
                 if (info.found) {
-                    cardsData[idx] = { ...cardsData[idx], ...info };
+                    // Descartar found/error/isNetworkError: são só sinalização
+                    // de transporte, não campos de carta — não devem grudar
+                    // em cardsData (que agora alimenta a exportação direto)
+                    const { found, error, isNetworkError, ...cleanInfo } = info;
+                    cardsData[idx] = { ...cardsData[idx], ...cleanInfo };
                     row.classList.add('completed');
                 } else {
                     if (info.isNetworkError) {
@@ -780,13 +838,7 @@
                     row.classList.add('error');
                 }
 
-                row.innerHTML = `
-                    <td class="card-name">${escapeHtml(cardsData[idx].name)}</td>
-                    <td class="card-info">${cardsData[idx].type ? escapeHtml(cardsData[idx].type) : '<span class="empty-cell">—</span>'}</td>
-                    <td class="card-info">${cardsData[idx].description ? escapeHtml(cardsData[idx].description) : '<span class="empty-cell">—</span>'}</td>
-                    <td>${cardsData[idx].power ? escapeHtml(cardsData[idx].power) : '<span class="empty-cell">—</span>'}</td>
-                    <td>${cardsData[idx].mana ? escapeHtml(cardsData[idx].mana) : '<span class="empty-cell">—</span>'}</td>
-                `;
+                row.innerHTML = buildRowCells(cardsData[idx]);
 
                 completed++;
                 progressFill.style.width = (completed / total * 100) + '%';
@@ -893,6 +945,7 @@
             }
 
             progressContainer.style.display = 'none';
+            ptToggle.disabled = false;
 
             // Verificar se ainda há cartas a preencher
             const hasCardsToFill = cardsData.some(card => card.type === null || card.description === null);
@@ -973,7 +1026,7 @@
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (line) {
-                    loadedCards.push({ name: line, type: null, description: null, power: null, mana: null });
+                    loadedCards.push({ name: line, namePt: null, type: null, description: null, power: null, mana: null });
                 }
             }
 
@@ -1014,6 +1067,7 @@
                     if (row && row[0]) {
                         loadedCards.push({
                             name: String(row[0]).trim(),
+                            namePt: null,
                             type: null,
                             description: null,
                             power: null,
@@ -1046,6 +1100,13 @@
 
         fillBtn.addEventListener('click', fillCards);
 
+        // Alternar o switch de PT-BR reflete na hora nas colunas da tabela
+        // (namePt já fica salvo em cardsData independente do estado do
+        // switch, então isso não refaz nenhuma requisição)
+        ptToggle.addEventListener('change', () => {
+            renderTable();
+        });
+
         clearBtn.addEventListener('click', () => {
             if (confirm('Tem certeza que deseja limpar todos os dados?')) {
                 location.reload();
@@ -1055,6 +1116,16 @@
         downloadBtn.addEventListener('click', () => {
             downloadAsExcel();
         });
+
+        // Monta o cabeçalho + linhas da planilha a partir de getColumnDefs(),
+        // espelhando exatamente as colunas exibidas na tela (inclusive
+        // Nome original / Nome em português quando a tradução está ligada)
+        function buildExportAoA() {
+            const columns = getColumnDefs();
+            const headers = columns.map(col => col.label);
+            const rows = cardsData.map(card => columns.map(col => col.get(card) || ''));
+            return [headers, ...rows];
+        }
 
         // Baixar como Excel
         async function downloadAsExcel() {
@@ -1071,7 +1142,16 @@
                     return;
                 }
 
-                const ws = XLSX.utils.json_to_sheet(cardsData);
+                const ws = XLSX.utils.aoa_to_sheet(buildExportAoA());
+                // Ativa as setinhas de filtro/ordenação do Excel no cabeçalho.
+                // Observação: a descrição já sai com as quebras de parágrafo
+                // (\n) corretas dentro da célula, mas a biblioteca gratuita
+                // usada aqui (SheetJS Community Edition) não escreve estilo
+                // de célula — para VER essas quebras no Excel, é preciso
+                // selecionar a coluna e ativar "Quebrar Texto Automaticamente"
+                // manualmente (Formatar > Célula > Alinhamento).
+                ws['!autofilter'] = { ref: ws['!ref'] };
+
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, 'Cartas');
                 XLSX.writeFile(wb, 'Junkook_Deck_Preenchido.xlsx');

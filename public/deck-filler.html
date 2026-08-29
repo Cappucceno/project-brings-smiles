@@ -378,11 +378,12 @@
     <script>
         // Dados da planilha
         const cardsData = [
-            { name: 'Arahbo, Roar of the World', namePt: null, type: 'Criatura Lendária — Felino Avatar', description: 'Eminência — No início do combate no seu turno, se Arahbo, Rugido do Mundo, estiver na zona de comando ou no campo de batalha, outro Felino alvo que você controla recebe +3/+3 até o final do turno.\n\nToda vez que outro Felino que você controla ataca, você pode pagar {1}{G}{W}. Se fizer isso, ele ganha atropelar e recebe +X/+X até o final do turno, sendo X seu poder.', power: '5/5', mana: '{3}{G}{W}' },
-            { name: 'Arahbo, the First Fang', namePt: null, type: null, description: null, power: null, mana: null },
-            { name: 'Hungry Lynx', namePt: null, type: null, description: null, power: null, mana: null },
-            { name: 'Jazal Goldmane', namePt: null, type: null, description: null, power: null, mana: null },
-            { name: 'Kaheera, the Orphanguard', namePt: null, type: null, description: null, power: null, mana: null },
+            { name: 'Arahbo, Roar of the World', namePt: null, type: 'Criatura Lendária — Felino Avatar', description: 'Eminência — No início do combate no seu turno, se Arahbo, Rugido do Mundo, estiver na zona de comando ou no campo de batalha, outro Felino alvo que você controla recebe +3/+3 até o final do turno.\n\nToda vez que outro Felino que você controla ataca, você pode pagar {1}{G}{W}. Se fizer isso, ele ganha atropelar e recebe +X/+X até o final do turno, sendo X seu poder.', nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: '5/5', mana: '{3}{G}{W}' },
+            { name: 'Arahbo, the First Fang', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
+            { name: 'Hungry Lynx', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
+            { name: 'Jazal Goldmane', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
+            { name: 'Kaheera, the Orphanguard', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
+            { name: 'Branchloft Pathway // Boulderloft Pathway', namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null },
         ];
 
         const statusEl = document.getElementById('statusMessage');
@@ -456,22 +457,34 @@
         // Definição das colunas da tabela (e, por extensão, da planilha
         // exportada) — "Nome" vira "Nome original" + "Nome em português"
         // quando a tradução estiver ligada, uma única coluna "Nome" quando
-        // estiver desligada. Fonte única usada pelo cabeçalho, pelas linhas
-        // e pela exportação em Excel, para nunca ficarem fora de sincronia.
+        // estiver desligada. As colunas de "(Verso)" ficam sempre visíveis
+        // (cartas de face única simplesmente mostram traço) — são para
+        // cartas de dupla face/split, que têm nome, tipo e descrição
+        // diferentes em cada lado. Poder/Resistência e Custo de Mana
+        // continuam únicos (só da frente). Fonte única usada pelo
+        // cabeçalho, pelas linhas e pela exportação em Excel, para nunca
+        // ficarem fora de sincronia.
         function getColumnDefs() {
-            const nameColumns = shouldSearchPortuguese()
+            const pt = shouldSearchPortuguese();
+
+            const nameColumns = pt
                 ? [
-                    { label: 'Nome original', width: 170, cellClass: 'card-name', get: card => card.name },
-                    { label: 'Nome em português', width: 170, cellClass: 'card-name', get: card => card.namePt },
+                    { label: 'Nome original', width: 150, cellClass: 'card-name', get: card => card.name },
+                    { label: 'Nome em português', width: 150, cellClass: 'card-name', get: card => card.namePt },
+                    { label: 'Nome original (Verso)', width: 150, cellClass: 'card-name', get: card => card.nameVerso },
+                    { label: 'Nome em português (Verso)', width: 150, cellClass: 'card-name', get: card => card.namePtVerso },
                 ]
                 : [
-                    { label: 'Nome', width: 200, cellClass: 'card-name', get: card => card.name },
+                    { label: 'Nome', width: 180, cellClass: 'card-name', get: card => card.name },
+                    { label: 'Nome (Verso)', width: 180, cellClass: 'card-name', get: card => card.nameVerso },
                 ];
 
             return [
                 ...nameColumns,
-                { label: 'Tipo', width: 250, cellClass: 'card-info', get: card => card.type },
-                { label: 'Descrição da Carta', width: 400, cellClass: 'card-info', get: card => card.description },
+                { label: 'Tipo', width: 200, cellClass: 'card-info', get: card => card.type },
+                { label: 'Tipo (Verso)', width: 200, cellClass: 'card-info', get: card => card.typeVerso },
+                { label: 'Descrição da Carta', width: 320, cellClass: 'card-info', get: card => card.description },
+                { label: 'Descrição da Carta (Verso)', width: 320, cellClass: 'card-info', get: card => card.descriptionVerso },
                 { label: 'Poder e Resistência', width: 120, cellClass: '', get: card => card.power },
                 { label: 'Custo de Mana', width: 120, cellClass: '', get: card => card.mana },
             ];
@@ -573,7 +586,9 @@
             }
         }
 
-        // Buscar informações da carta na API Scryfall
+        // Buscar informações da carta na API Scryfall (usado só como
+        // fallback fuzzy individual, para nomes que não bateram exato no
+        // lote — não mais um caminho dedicado a cartas "//")
         async function fetchCardFromScryfall(cardName) {
             try {
                 const response = await fetchScryfall(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardName)}`);
@@ -584,6 +599,10 @@
                         namePt: null,
                         type: null,
                         description: null,
+                        nameVerso: null,
+                        namePtVerso: null,
+                        typeVerso: null,
+                        descriptionVerso: null,
                         power: null,
                         mana: null,
                         found: false,
@@ -596,15 +615,7 @@
                 }
 
                 const data = await response.json();
-
-                // Nome em inglês (Oracle) — nunca é sobrescrito, mesmo quando
-                // uma tradução em português é encontrada
-                const name = data.name || cardName;
-                let namePt = null;
-                let type = data.type_line || '';
-                let description = data.oracle_text || '';
-                const power = data.power && data.toughness ? `${data.power}/${data.toughness}` : '';
-                const mana = data.mana_cost || '';
+                let ptCard = null;
 
                 // Buscar a impressão em português (campos "printed_*" trazem o texto
                 // localizado; "oracle_text"/"type_line" são sempre o texto Oracle em
@@ -620,13 +631,7 @@
 
                         if (ptResponse && ptResponse.ok) {
                             const ptResult = await ptResponse.json();
-                            const ptCard = ptResult.data && ptResult.data[0];
-
-                            if (ptCard) {
-                                namePt = ptCard.printed_name || null;
-                                type = ptCard.printed_type_line || type;
-                                description = ptCard.printed_text || description;
-                            }
+                            ptCard = (ptResult.data && ptResult.data[0]) || null;
                         }
                     } catch (e) {
                         // Sem versão em português disponível: manter os dados em inglês
@@ -634,15 +639,7 @@
                     }
                 }
 
-                return {
-                    name,
-                    namePt,
-                    type,
-                    description,
-                    power,
-                    mana,
-                    found: true
-                };
+                return { ...buildFaceInfo(data, ptCard), found: true };
             } catch (error) {
                 console.error(`Erro ao buscar ${cardName}:`, error);
                 return {
@@ -650,6 +647,10 @@
                     namePt: null,
                     type: null,
                     description: null,
+                    nameVerso: null,
+                    namePtVerso: null,
+                    typeVerso: null,
+                    descriptionVerso: null,
                     power: null,
                     mana: null,
                     found: false,
@@ -697,6 +698,83 @@
                 chunks.push(array.slice(i, i + size));
             }
             return chunks;
+        }
+
+        // Cartas de dupla face/split/modal DFC são escritas como
+        // "Frente // Verso". A Scryfall resolve o nome de uma única face
+        // (sem o "//") para a carta completa, então usamos só a parte da
+        // frente como identificador de busca — sem precisar de fuzzy.
+        function frontSearchName(name) {
+            const sepIndex = name.indexOf('//');
+            return sepIndex === -1 ? name : name.slice(0, sepIndex).trim();
+        }
+
+        // Normaliza uma string para comparação (usado só como chave de
+        // mapa — o texto original, com maiúsculas/espaços, continua sendo
+        // o que é exibido/enviado)
+        function normalizeKey(name) {
+            return name.trim().toLowerCase();
+        }
+
+        // Devolve os dados de uma face da carta. Cartas de dupla face têm
+        // um array card_faces com os dados de cada lado; cartas de face
+        // única não têm esse array — nesse caso a "frente" é o próprio
+        // objeto da carta, e não existe "verso" (índice 1 = null).
+        function getCardFace(card, index) {
+            if (card && Array.isArray(card.card_faces) && card.card_faces.length > index) {
+                return card.card_faces[index];
+            }
+            return index === 0 ? card : null;
+        }
+
+        // Monta o conjunto completo de campos (frente + verso, inglês + PT)
+        // a partir de uma carta da Scryfall e, opcionalmente, da mesma
+        // carta na tradução em português. Único lugar que interpreta
+        // card_faces — usado tanto na busca em lote quanto no fallback
+        // fuzzy individual.
+        function buildFaceInfo(data, ptCard) {
+            const frontFace = getCardFace(data, 0);
+            const backFace = getCardFace(data, 1); // null em cartas de face única
+
+            const name = frontFace.name || data.name;
+            let type = frontFace.type_line || '';
+            let description = frontFace.oracle_text || '';
+            const power = frontFace.power && frontFace.toughness ? `${frontFace.power}/${frontFace.toughness}` : '';
+            const mana = frontFace.mana_cost || '';
+
+            const nameVerso = backFace ? (backFace.name || null) : null;
+            let typeVerso = backFace ? (backFace.type_line || '') : null;
+            let descriptionVerso = backFace ? (backFace.oracle_text || '') : null;
+
+            let namePt = null;
+            let namePtVerso = null;
+
+            if (ptCard) {
+                // Não verificado ao vivo nesta sessão (sem acesso à API):
+                // assumindo que printed_name/printed_type_line/printed_text
+                // de uma carta multi-face em português ficam dentro de
+                // card_faces[i], no mesmo padrão do inglês. Se ao rodar
+                // contra a Scryfall real isso vier diferente para o verso
+                // especificamente, ajustar aqui.
+                const ptFrontFace = getCardFace(ptCard, 0);
+                const ptBackFace = getCardFace(ptCard, 1);
+
+                namePt = ptFrontFace.printed_name || null;
+                type = ptFrontFace.printed_type_line || type;
+                description = ptFrontFace.printed_text || description;
+
+                if (backFace) {
+                    namePtVerso = ptBackFace ? (ptBackFace.printed_name || null) : null;
+                    typeVerso = (ptBackFace && ptBackFace.printed_type_line) || typeVerso;
+                    descriptionVerso = (ptBackFace && ptBackFace.printed_text) || descriptionVerso;
+                }
+            }
+
+            return {
+                name, namePt, type, description,
+                nameVerso, namePtVerso, typeVerso, descriptionVerso,
+                power, mana
+            };
         }
 
         // Versão genérica do circuit breaker acima, para as chamadas em
@@ -773,21 +851,7 @@
         // (endpoint de coleção) e, se existir, da tradução em português.
         // O nome em inglês nunca é sobrescrito — a tradução vai para namePt.
         function buildCardInfo(data, ptMap) {
-            const name = data.name;
-            let namePt = null;
-            let type = data.type_line || '';
-            let description = data.oracle_text || '';
-            const power = data.power && data.toughness ? `${data.power}/${data.toughness}` : '';
-            const mana = data.mana_cost || '';
-
-            const ptCard = ptMap.get(data.name);
-            if (ptCard) {
-                namePt = ptCard.printed_name || null;
-                type = ptCard.printed_type_line || type;
-                description = ptCard.printed_text || description;
-            }
-
-            return { name, namePt, type, description, power, mana, found: true };
+            return { ...buildFaceInfo(data, ptMap.get(data.name) || null), found: true };
         }
 
         // Preencher as cartas
@@ -845,103 +909,124 @@
                 progressText.textContent = `${completed}/${total}`;
             }
 
-            // Cartas com "//" no nome (dupla face / split) usam busca fuzzy
-            // individual, já que nem sempre batem exato no endpoint de
-            // lote. As demais entram no lote, reduzindo drasticamente o
-            // número de requisições feitas à Scryfall.
-            const fuzzyIndices = [];
-            const batchIndices = [];
-            cardsToFill.forEach(card => {
-                const idx = cardsData.indexOf(card);
-                if (card.name.includes('//')) {
-                    fuzzyIndices.push(idx);
-                } else {
-                    batchIndices.push(idx);
-                }
-            });
-
-            [...fuzzyIndices, ...batchIndices].forEach(idx => {
+            // Todas as cartas passam pela busca em lote agora — inclusive
+            // as de dupla face/split ("//"), buscadas só pelo nome da
+            // face da frente (exato, sem precisar de fuzzy). O fuzzy
+            // individual (fetchCardWithResilience) fica só como fallback
+            // pra nomes que não baterem exato no lote.
+            const indicesToFill = cardsToFill.map(card => cardsData.indexOf(card));
+            indicesToFill.forEach(idx => {
                 document.querySelector(`tr[data-index="${idx}"]`).classList.add('loading');
             });
 
-            // 1) Cartas multi-face: busca individual
-            for (const idx of fuzzyIndices) {
-                const info = await fetchCardWithResilience(cardsData[idx].name, onCooldown);
-                applyResult(idx, info);
-                await delay(100);
+            // 1) Agrupar por nome completo original (dedupe de linhas
+            //    idênticas) — é o nome completo que fica salvo em
+            //    cardsData e é usado no fallback fuzzy caso precise
+            const nameToIndices = new Map();
+            indicesToFill.forEach(idx => {
+                const name = cardsData[idx].name;
+                if (!nameToIndices.has(name)) {
+                    nameToIndices.set(name, []);
+                }
+                nameToIndices.get(name).push(idx);
+            });
+            const uniqueNames = [...nameToIndices.keys()];
+
+            // 2) Agrupar os nomes completos únicos pelo identificador de
+            //    busca (nome da frente, truncado em "//") — é isso que
+            //    de fato vai pro endpoint de lote
+            const searchKeyToOriginalNames = new Map(); // chave normalizada -> [nomes completos]
+            const searchKeys = [];
+            for (const originalName of uniqueNames) {
+                const searchKey = frontSearchName(originalName);
+                const norm = normalizeKey(searchKey);
+                if (!searchKeyToOriginalNames.has(norm)) {
+                    searchKeyToOriginalNames.set(norm, []);
+                    searchKeys.push(searchKey);
+                }
+                searchKeyToOriginalNames.get(norm).push(originalName);
             }
 
-            // 2) Demais cartas: busca em lote
-            if (batchIndices.length > 0) {
-                const nameToIndices = new Map();
-                batchIndices.forEach(idx => {
-                    const name = cardsData[idx].name;
-                    if (!nameToIndices.has(name)) {
-                        nameToIndices.set(name, []);
+            const foundByOriginalName = new Map();
+            const notFoundOriginalNames = [];
+
+            for (const chunk of chunkArray(searchKeys, 75)) {
+                try {
+                    const result = await withResilience(
+                        () => fetchCollectionBatch(chunk),
+                        'lote de cartas',
+                        onCooldown
+                    );
+
+                    // Casar a carta devolvida de volta aos nomes originais
+                    // pelo conteúdo (recalculando a mesma chave de busca a
+                    // partir da resposta), não pela posição na resposta —
+                    // não há garantia confirmada de que a ordem da resposta
+                    // bate com a da requisição
+                    for (const card of result.found) {
+                        const returnedKey = normalizeKey((card.card_faces && card.card_faces[0] && card.card_faces[0].name) || card.name);
+                        const originalNames = searchKeyToOriginalNames.get(returnedKey);
+                        if (!originalNames) {
+                            console.warn('Carta devolvida pelo lote não bateu com nenhum identificador enviado:', card.name);
+                            continue;
+                        }
+                        for (const originalName of originalNames) {
+                            foundByOriginalName.set(originalName, card);
+                        }
                     }
-                    nameToIndices.get(name).push(idx);
-                });
 
-                const uniqueNames = [...nameToIndices.keys()];
-                const foundByName = new Map();
-                const notFoundNames = [];
+                    for (const notFoundKey of result.notFound) {
+                        const originalNames = searchKeyToOriginalNames.get(normalizeKey(notFoundKey)) || [];
+                        notFoundOriginalNames.push(...originalNames);
+                    }
+                } catch (e) {
+                    console.error('Falha ao buscar lote de cartas:', e);
+                    for (const searchKey of chunk) {
+                        notFoundOriginalNames.push(...(searchKeyToOriginalNames.get(normalizeKey(searchKey)) || []));
+                    }
+                }
+                await delay(150);
+            }
 
-                for (const chunk of chunkArray(uniqueNames, 75)) {
+            // Traduções em português em lote, usando os nomes exatos
+            // devolvidos pela Scryfall (para casar corretamente) — só
+            // quando o usuário deixou a opção ligada
+            const ptMap = new Map();
+            if (shouldSearchPortuguese()) {
+                const exactNames = [...new Set([...foundByOriginalName.values()].map(card => card.name))];
+                for (const chunk of chunkArray(exactNames, 10)) {
                     try {
-                        const result = await withResilience(
-                            () => fetchCollectionBatch(chunk),
-                            'lote de cartas',
+                        const chunkPtMap = await withResilience(
+                            () => fetchPortugueseBatch(chunk),
+                            'traduções em português',
                             onCooldown
                         );
-                        for (const card of result.found) {
-                            foundByName.set(card.name, card);
-                        }
-                        notFoundNames.push(...result.notFound);
+                        chunkPtMap.forEach((value, key) => ptMap.set(key, value));
                     } catch (e) {
-                        console.error('Falha ao buscar lote de cartas:', e);
-                        notFoundNames.push(...chunk);
+                        // Sem tradução disponível para este lote: seguem em inglês
+                        console.warn('Falha ao buscar traduções em português em lote:', e);
                     }
                     await delay(150);
                 }
+            }
 
-                // Traduções em português em lote, usando os nomes exatos
-                // devolvidos pela Scryfall (para casar corretamente) — só
-                // quando o usuário deixou a opção ligada
-                const ptMap = new Map();
-                if (shouldSearchPortuguese()) {
-                    const exactNames = [...foundByName.values()].map(card => card.name);
-                    for (const chunk of chunkArray(exactNames, 10)) {
-                        try {
-                            const chunkPtMap = await withResilience(
-                                () => fetchPortugueseBatch(chunk),
-                                'traduções em português',
-                                onCooldown
-                            );
-                            chunkPtMap.forEach((value, key) => ptMap.set(key, value));
-                        } catch (e) {
-                            // Sem tradução disponível para este lote: seguem em inglês
-                            console.warn('Falha ao buscar traduções em português em lote:', e);
-                        }
-                        await delay(150);
-                    }
+            for (const [originalName, data] of foundByOriginalName) {
+                const info = buildCardInfo(data, ptMap);
+                for (const idx of nameToIndices.get(originalName)) {
+                    applyResult(idx, info);
                 }
+            }
 
-                for (const [name, data] of foundByName) {
-                    const info = buildCardInfo(data, ptMap);
-                    for (const idx of nameToIndices.get(name)) {
-                        applyResult(idx, info);
-                    }
+            // Nomes que não bateram exato no lote: tentar individualmente
+            // via busca fuzzy (com o nome completo original, não o
+            // truncado — o fuzzy da Scryfall já lida bem com "//") antes
+            // de desistir de vez
+            for (const originalName of notFoundOriginalNames) {
+                const info = await fetchCardWithResilience(originalName, onCooldown);
+                for (const idx of nameToIndices.get(originalName)) {
+                    applyResult(idx, info);
                 }
-
-                // Nomes que não bateram exato no lote: tentar individualmente
-                // via busca fuzzy antes de desistir de vez
-                for (const name of notFoundNames) {
-                    const info = await fetchCardWithResilience(name, onCooldown);
-                    for (const idx of nameToIndices.get(name)) {
-                        applyResult(idx, info);
-                    }
-                    await delay(100);
-                }
+                await delay(100);
             }
 
             progressContainer.style.display = 'none';
@@ -1026,7 +1111,7 @@
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (line) {
-                    loadedCards.push({ name: line, namePt: null, type: null, description: null, power: null, mana: null });
+                    loadedCards.push({ name: line, namePt: null, type: null, description: null, nameVerso: null, namePtVerso: null, typeVerso: null, descriptionVerso: null, power: null, mana: null });
                 }
             }
 
@@ -1070,6 +1155,10 @@
                             namePt: null,
                             type: null,
                             description: null,
+                            nameVerso: null,
+                            namePtVerso: null,
+                            typeVerso: null,
+                            descriptionVerso: null,
                             power: null,
                             mana: null
                         });

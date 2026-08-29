@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preenchedor de Deck Scryfall</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 1em;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(30, 60, 114, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.info {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            color: #0c5460;
+        }
+
+        .status.success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+
+        .status.warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        thead {
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #1e3c72;
+            font-size: 0.95em;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        tbody tr {
+            transition: background-color 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        tbody tr.loading {
+            background-color: #fffacd;
+        }
+
+        tbody tr.completed {
+            background-color: #e8f5e9;
+        }
+
+        tbody tr.error {
+            background-color: #ffebee;
+        }
+
+        .card-name {
+            font-weight: 600;
+            color: #1e3c72;
+            word-break: break-word;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #2a5298;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #666;
+        }
+
+        .empty-cell {
+            color: #ccc;
+            font-style: italic;
+        }
+
+        .footer {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            text-align: center;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2a5298 0%, #6eb7e8 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .card-info {
+            font-size: 0.9em;
+            color: #666;
+            max-height: 100px;
+            overflow-y: auto;
+            word-break: break-word;
+            line-height: 1.4;
+        }
+
+        .tag {
+            display: inline-block;
+            background: #e9ecef;
+            color: #495057;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            margin-right: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎴 Preenchedor de Deck Scryfall</h1>
+            <p>Preencha automaticamente os dados das cartas Magic: The Gathering usando a API Scryfall</p>
+        </div>
+
+        <div class="content">
+            <div class="controls">
+                <button class="btn-primary" id="loadBtn">📁 Carregar Planilha</button>
+                <button class="btn-success" id="fillBtn" disabled>🔄 Preencher Cartas</button>
+                <button class="btn-secondary" id="downloadBtn" disabled>⬇️ Baixar Excel</button>
+                <button class="btn-secondary" id="clearBtn">🗑️ Limpar</button>
+            </div>
+
+            <div id="statusMessage" class="status"></div>
+
+            <div class="table-wrapper">
+                <table id="cardsTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 200px;">Nome</th>
+                            <th style="width: 250px;">Tipo</th>
+                            <th style="width: 400px;">Descrição da Carta</th>
+                            <th style="width: 120px;">Poder e Resistência</th>
+                            <th style="width: 120px;">Custo de Mana</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cardsBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="progressContainer" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p style="text-align: center; margin-top: 10px; font-size: 0.9em; color: #666;">
+                    <span id="progressText">0/0</span>
+                </p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Powered by Scryfall API • Desenvolvido para preencher decks Magic: The Gathering</p>
+        </div>
+    </div>
+
+    <script>
+        // Dados da planilha
+        const cardsData = [
+            { name: 'Arahbo, Roar of the World', type: 'Criatura Lendária — Felino Avatar', description: 'Eminência — No início do combate no seu turno, se Arahbo, Rugido do Mundo, estiver na zona de comando ou no campo de batalha, outro Felino alvo que você controla recebe +3/+3 até o final do turno.\n\nToda vez que outro Felino que você controla ataca, você pode pagar {1}{G}{W}. Se fizer isso, ele ganha atropelar e recebe +X/+X até o final do turno, sendo X seu poder.', power: '5/5', mana: '{3}{G}{W}' },
+            { name: 'Arahbo, the First Fang', type: null, description: null, power: null, mana: null },
+            { name: 'Hungry Lynx', type: null, description: null, power: null, mana: null },
+            { name: 'Jazal Goldmane', type: null, description: null, power: null, mana: null },
+            { name: 'Kaheera, the Orphanguard', type: null, description: null, power: null, mana: null },
+        ];
+
+        const statusEl = document.getElementById('statusMessage');
+        const fillBtn = document.getElementById('fillBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const cardsBody = document.getElementById('cardsBody');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+
+        // Renderizar tabela inicial
+        function renderTable() {
+            cardsBody.innerHTML = cardsData.map((card, idx) => `
+                <tr class="card-row" data-index="${idx}">
+                    <td class="card-name">${escapeHtml(card.name)}</td>
+                    <td class="card-info">${card.type ? escapeHtml(card.type) : '<span class="empty-cell">—</span>'}</td>
+                    <td class="card-info">${card.description ? escapeHtml(card.description) : '<span class="empty-cell">—</span>'}</td>
+                    <td>${card.power ? escapeHtml(card.power) : '<span class="empty-cell">—</span>'}</td>
+                    <td>${card.mana ? escapeHtml(card.mana) : '<span class="empty-cell">—</span>'}</td>
+                </tr>
+            `).join('');
+
+            fillBtn.disabled = false;
+        }
+
+        // Buscar informações da carta na API Scryfall
+        async function fetchCardFromScryfall(cardName) {
+            try {
+                const response = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardName)}`);
+                if (!response.ok) {
+                    throw new Error(`Erro: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                // Tentar obter dados em português, senão usar inglês
+                const name = data.name || cardName;
+                const type = data.type_line || '';
+                const oracleText = data.oracle_text || '';
+                const power = data.power && data.toughness ? `${data.power}/${data.toughness}` : '';
+                const mana = data.mana_cost || '';
+
+                // Tentar buscar versão em português
+                if (data.lang !== 'pt') {
+                    try {
+                        const ptResponse = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardName)}&lang=pt`);
+                        if (ptResponse.ok) {
+                            const ptData = await ptResponse.json();
+                            return {
+                                name: ptData.name || name,
+                                type: ptData.type_line || type,
+                                description: ptData.oracle_text || oracleText,
+                                power: ptData.power && ptData.toughness ? `${ptData.power}/${ptData.toughness}` : power,
+                                mana: ptData.mana_cost || mana,
+                                found: true
+                            };
+                        }
+                    } catch (e) {
+                        // Se não houver versão em português, usar inglês
+                    }
+                }
+
+                return {
+                    name,
+                    type,
+                    description: oracleText,
+                    power,
+                    mana,
+                    found: true
+                };
+            } catch (error) {
+                console.error(`Erro ao buscar ${cardName}:`, error);
+                return {
+                    name: cardName,
+                    type: null,
+                    description: null,
+                    power: null,
+                    mana: null,
+                    found: false,
+                    error: error.message
+                };
+            }
+        }
+
+        // Preencher as cartas
+        async function fillCards() {
+            const cardsToFill = cardsData.filter((card, idx) => {
+                return card.type === null || card.description === null;
+            });
+
+            if (cardsToFill.length === 0) {
+                showStatus('Todas as cartas já estão preenchidas!', 'success');
+                return;
+            }
+
+            fillBtn.disabled = true;
+            progressContainer.style.display = 'block';
+            showStatus(`Preenchendo ${cardsToFill.length} carta(s)...`, 'info');
+
+            let completed = 0;
+            const total = cardsToFill.length;
+
+            for (let i = 0; i < cardsData.length; i++) {
+                const card = cardsData[i];
+                if (card.type === null || card.description === null) {
+                    const row = document.querySelector(`tr[data-index="${i}"]`);
+                    row.classList.add('loading');
+
+                    const cardInfo = await fetchCardFromScryfall(card.name);
+
+                    if (cardInfo.found) {
+                        cardsData[i] = { ...cardsData[i], ...cardInfo };
+                        row.classList.add('completed');
+                        row.classList.remove('loading');
+                    } else {
+                        row.classList.add('error');
+                        row.classList.remove('loading');
+                    }
+
+                    // Atualizar linha
+                    row.innerHTML = `
+                        <td class="card-name">${escapeHtml(cardsData[i].name)}</td>
+                        <td class="card-info">${cardsData[i].type ? escapeHtml(cardsData[i].type) : '<span class="empty-cell">—</span>'}</td>
+                        <td class="card-info">${cardsData[i].description ? escapeHtml(cardsData[i].description) : '<span class="empty-cell">—</span>'}</td>
+                        <td>${cardsData[i].power ? escapeHtml(cardsData[i].power) : '<span class="empty-cell">—</span>'}</td>
+                        <td>${cardsData[i].mana ? escapeHtml(cardsData[i].mana) : '<span class="empty-cell">—</span>'}</td>
+                    `;
+
+                    completed++;
+                    progressFill.style.width = (completed / total * 100) + '%';
+                    progressText.textContent = `${completed}/${total}`;
+
+                    // Respeitar rate limit (100 requisições/segundo)
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+
+            progressContainer.style.display = 'none';
+            fillBtn.disabled = false;
+            downloadBtn.disabled = false;
+            showStatus('✅ Todas as cartas foram preenchidas com sucesso!', 'success');
+        }
+
+        // Mostrar mensagem de status
+        function showStatus(message, type = 'info') {
+            statusEl.textContent = message;
+            statusEl.className = `status show ${type}`;
+            setTimeout(() => {
+                if (type !== 'error' && type !== 'warning') {
+                    statusEl.classList.remove('show');
+                }
+            }, 5000);
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Event listeners
+        fillBtn.addEventListener('click', fillCards);
+        
+        clearBtn.addEventListener('click', () => {
+            if (confirm('Tem certeza que deseja limpar todos os dados?')) {
+                location.reload();
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            downloadAsExcel();
+        });
+
+        // Baixar como Excel
+        async function downloadAsExcel() {
+            // Usar biblioteca para gerar Excel
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
+            script.onload = () => {
+                const ws = XLSX.utils.json_to_sheet(cardsData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Cartas');
+                XLSX.writeFile(wb, 'Junkook_Deck_Preenchido.xlsx');
+                showStatus('✅ Arquivo baixado com sucesso!', 'success');
+            };
+            document.head.appendChild(script);
+        }
+
+        // Inicializar
+        renderTable();
+    </script>
+</body>
+</html>

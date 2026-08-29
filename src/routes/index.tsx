@@ -1,24 +1,33 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "Preenchedor de Deck Scryfall — Magic: The Gathering" },
+      {
+        name: "description",
+        content:
+          "Preencha automaticamente os dados das cartas do seu deck de Magic: The Gathering usando a API Scryfall e baixe a planilha em Excel.",
+      },
+      { property: "og:title", content: "Preenchedor de Deck Scryfall" },
+      {
+        property: "og:description",
+        content:
+          "Preencha automaticamente os dados das cartas do seu deck de Magic: The Gathering usando a API Scryfall e baixe a planilha em Excel.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <iframe
+      src="/deck-filler.html"
+      title="Preenchedor de Deck Scryfall"
+      className="h-screen w-screen border-0"
+    />
   );
 }
